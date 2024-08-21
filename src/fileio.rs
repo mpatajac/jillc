@@ -157,8 +157,7 @@ pub mod input {
 
 pub mod output {
     use std::{
-        fs,
-        io::{self, Write},
+        fs, io,
         path::{Path, PathBuf},
     };
 
