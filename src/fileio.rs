@@ -119,9 +119,8 @@ pub mod input {
     }
 
     impl Iterator for SourceDir {
-        type Item = io::Result<SourceFile>;
+        type Item = (PathBuf, io::Result<SourceFile>);
 
-        // TODO?: iterate only over file names and have a separate function for loading?
         fn next(&mut self) -> Option<Self::Item> {
             // reached the end of the file list - no more files to load
             if self.current_file_index == self.source_file_paths.len() {
@@ -140,12 +139,13 @@ pub mod input {
             // on successful read, store content (and other metadata) to model
             let source_file_result = read_result.map(|content| SourceFile {
                 src_path: self.src_path.clone(),
-                file_path,
+                file_path: file_path.clone(),
                 content,
             });
 
-            // NOTE: keep as result (as any of the file reads could fail), handle on per-file basis
-            Some(source_file_result)
+            // keep as result (as any of the file reads could fail), handle on per-file basis
+            // keep `file_path` separate to the action result so we can denote file at fault in case of failure
+            Some((file_path, source_file_result))
         }
     }
 }
