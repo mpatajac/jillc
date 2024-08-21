@@ -179,7 +179,7 @@ pub mod output {
         let bin_path = ensure_bin_dir_exists(root_path)?;
         let file_path = bin_path.join(output_file.name).with_extension("vm");
 
-        fs::File::create(file_path)?.write_all(output_file.content.as_bytes())
+        fs::write(file_path, output_file.content)
     }
 
     fn ensure_bin_dir_exists(root_path: &Path) -> io::Result<PathBuf> {
