@@ -107,9 +107,14 @@ pub mod input {
             for entry in fs::read_dir(dir)? {
                 let entry = entry?;
                 let path = entry.path();
+
+                // recursively visit nested directories
                 if path.is_dir() {
                     Self::collect_source_files(&path, collected)?;
-                } else {
+                }
+
+                // only add `.jill` files
+                if path.extension().map_or(false, |ext| ext == "jill") {
                     collected.push(path);
                 }
             }
