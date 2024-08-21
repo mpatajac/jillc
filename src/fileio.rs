@@ -49,21 +49,16 @@ pub mod output {
         }
     }
 
-    pub fn generate(root_path: &Path, output_files: Vec<OutputFile>) -> io::Result<()> {
+    pub fn generate(root_path: &Path, output_file: OutputFile) -> io::Result<()> {
+        super::check_root_path(root_path)?;
+
         let bin_path = ensure_bin_dir_exists(root_path)?;
+        let file_path = bin_path.join(output_file.name).with_extension("vm");
 
-        for file_data in output_files {
-            let file_path = bin_path.join(file_data.name).with_extension("vm");
-
-            fs::File::create(file_path)?.write_all(file_data.content.as_bytes())?;
-        }
-
-        Ok(())
+        fs::File::create(file_path)?.write_all(output_file.content.as_bytes())
     }
 
     fn ensure_bin_dir_exists(root_path: &Path) -> io::Result<PathBuf> {
-        super::check_root_path(root_path)?;
-
         let bin_path = root_path.join("bin");
         if !bin_path.is_dir() {
             fs::create_dir(&bin_path)?;
