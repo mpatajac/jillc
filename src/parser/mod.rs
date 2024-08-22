@@ -38,11 +38,15 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
         .map(|chars| chars.into_iter().collect())
         .map(JillLiteral::String);
 
-    let literal = integer.or(string).padded().map(JillExpression::Literal);
-
-    let expression = literal;
+    let literal = integer.or(string).map(JillExpression::Literal);
 
     let identifier = text::ident().padded();
+
+    let variable_name = identifier
+        .map(JillIdentifier)
+        .map(JillExpression::VariableName);
+
+    let expression = literal.or(variable_name).padded();
 
     let variable = text::keyword("let")
         .ignore_then(identifier)

@@ -43,9 +43,9 @@ pub struct JillFunction {
 #[derive(Debug)]
 pub enum JillExpression {
     Literal(JillLiteral),
-    // VariableName(??),
     // FunctionCall(??),
     // FunctionReference(??),
+    VariableName(JillIdentifier),
 }
 
 #[derive(Debug)]
