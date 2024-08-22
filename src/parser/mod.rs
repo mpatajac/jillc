@@ -40,17 +40,13 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
     let literal = integer.or(string).map(JillExpression::Literal);
 
-    let identifier = text::ident().padded();
-
-    let variable_name = identifier
-        .map(JillIdentifier)
-        .map(JillExpression::VariableName);
 
     let expression = literal.or(variable_name).padded();
+    let identifier = text::ident().padded().map(JillIdentifier);
 
+    let variable_name = identifier.map(JillExpression::VariableName);
     let variable = text::keyword("let")
         .ignore_then(identifier)
-        .map(JillIdentifier)
         .then_ignore(just('='))
         .then(expression.clone())
         .padded()
@@ -80,9 +76,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
         text::keyword("fn")
             .ignore_then(identifier)
-            .map(JillIdentifier)
             .then(identifier.repeated())
-            .map(|(name, args)| (name, JillIdentifier::map_vec(args)))
             .then_ignore(just('='))
             .then(function_body)
             .padded()

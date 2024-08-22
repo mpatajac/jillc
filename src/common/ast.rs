@@ -65,13 +65,7 @@ pub enum JillLiteral {
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JillIdentifier(pub String);
-
-impl JillIdentifier {
-    pub fn map_vec(identifiers: Vec<String>) -> Vec<JillIdentifier> {
-        identifiers.into_iter().map(JillIdentifier).collect()
-    }
-}
 
 // endregion
