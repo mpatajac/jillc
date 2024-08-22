@@ -8,6 +8,8 @@ pub struct JillProgram {
     pub modules: Vec<JillModule>,
 }
 
+// region: non-terminals
+
 #[derive(Debug)]
 pub struct JillModule {
     pub name: String,
@@ -18,9 +20,9 @@ pub struct JillModule {
 pub struct JillModuleContent {
     // `let`
     pub variables: Vec<JillVariable>,
-    // `fn`
-    // pub functions: Vec<JillFunction>,
 
+    // `fn`
+    pub functions: Vec<JillFunction>,
     // `type`
     // pub types: Vec<JillType>,
 }
@@ -32,11 +34,30 @@ pub struct JillVariable {
 }
 
 #[derive(Debug)]
+pub struct JillFunction {
+    pub name: JillIdentifier,
+    pub arguments: Vec<JillIdentifier>,
+    pub body: JillFunctionBody,
+}
+
+#[derive(Debug)]
 pub enum JillExpression {
     Literal(JillLiteral),
+    // VariableName(??),
     // FunctionCall(??),
-    // VariableName(??)
+    // FunctionReference(??),
 }
+
+#[derive(Debug)]
+pub struct JillFunctionBody {
+    pub local_functions: Vec<JillFunction>,
+    pub local_variables: Vec<JillVariable>,
+    pub return_expression: JillExpression,
+}
+
+// endregion
+
+// region: terminals
 
 #[derive(Debug)]
 pub enum JillLiteral {
@@ -48,3 +69,14 @@ pub enum JillLiteral {
 pub struct JillIdentifier {
     pub value: String,
 }
+
+impl JillIdentifier {
+    pub fn map_vec(identifiers: Vec<String>) -> Vec<JillIdentifier> {
+        identifiers
+            .into_iter()
+            .map(|identifier| JillIdentifier { value: identifier })
+            .collect()
+    }
+}
+
+// endregion

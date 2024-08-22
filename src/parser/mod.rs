@@ -44,14 +44,56 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
         .map(|name| JillIdentifier { value: name })
         .then_ignore(just('='))
         .then(expression.clone())
+        .padded()
         .map(|(name, value)| JillVariable { name, value });
 
-    let declaration = variable.padded();
+    let function = recursive(|function| {
+        let function_body = function
+            .separated_by(just('.'))
+            .allow_trailing()
+            .padded()
+            .then(
+                variable
+                    .clone()
+                    .separated_by(just(','))
+                    .allow_trailing()
+                    .padded(),
+            )
+            .then(expression)
+            .padded()
+            .map(
+                |((local_functions, local_variables), return_expression)| JillFunctionBody {
+                    local_functions,
+                    local_variables,
+                    return_expression,
+                },
+            );
 
-    // TODO: figure out how exactly this needs to be set
-    declaration
+        text::keyword("fn")
+            .ignore_then(identifier)
+            .map(|name| JillIdentifier { value: name })
+            .then(identifier.repeated())
+            .map(|(name, args)| (name, JillIdentifier::map_vec(args)))
+            .then_ignore(just('='))
+            .then(function_body)
+            .padded()
+            .map(|((name, arguments), body)| JillFunction {
+                name,
+                arguments,
+                body,
+            })
+    });
+
+    let module = variable
         .separated_by(just('.'))
         .allow_trailing()
-        .map(|d| JillModuleContent { variables: d })
-        .then_ignore(end())
+        .then(function.separated_by(just('.')).allow_trailing())
+        .padded()
+        .map(|(variables, functions)| JillModuleContent {
+            variables,
+            functions,
+        });
+
+    // TODO: figure out how exactly this needs to be set
+    module.then_ignore(end())
 }
