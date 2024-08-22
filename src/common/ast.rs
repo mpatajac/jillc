@@ -66,16 +66,11 @@ pub enum JillLiteral {
 }
 
 #[derive(Debug)]
-pub struct JillIdentifier {
-    pub value: String,
-}
+pub struct JillIdentifier(pub String);
 
 impl JillIdentifier {
     pub fn map_vec(identifiers: Vec<String>) -> Vec<JillIdentifier> {
-        identifiers
-            .into_iter()
-            .map(|identifier| JillIdentifier { value: identifier })
-            .collect()
+        identifiers.into_iter().map(JillIdentifier).collect()
     }
 }
 
