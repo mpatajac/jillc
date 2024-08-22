@@ -21,6 +21,8 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
     })
 }
 
+// TODO: try to split into separate functions
+#[allow(clippy::too_many_lines)]
 /// Construct the parser for a Jill program module (file).
 fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     let positive_integer =
@@ -43,7 +45,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     let expression = recursive(|expression| {
         let literal = integer.or(string).map(JillExpression::Literal);
 
-        let variable_name = identifier.map(JillExpression::VariableName);
+        let variable_name = identifier;
 
         // ( :: | ( mod_name:: )+ )
         let local_module_path = just("::").to(Vec::new());
@@ -66,11 +68,36 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
                 },
             );
 
+        let function_call = {
+            let function_call_source =
+                function_reference
+                    .clone()
+                    .or(variable_name.map(|name| JillFunctionReference {
+                        modules_path: vec![],
+                        associated_type: None,
+                        function_name: name,
+                    }));
+
+            function_call_source
+                .then(
+                    expression
+                        .clone()
+                        .separated_by(just(','))
+                        .allow_trailing()
+                        .delimited_by(just('('), just(')')),
+                )
+                .map(|(reference, arguments)| JillFunctionCall {
+                    reference,
+                    arguments,
+                })
+        };
+
         // since there is possible ambiguity here, order in which the
         // options are listed is important (most specific => least specific)
         literal
+            .or(function_call.map(JillExpression::FunctionCall))
             .or(function_reference.map(JillExpression::FunctionReference))
-            .or(variable_name)
+            .or(variable_name.map(JillExpression::VariableName))
             .padded()
     });
 
