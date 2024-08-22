@@ -27,8 +27,7 @@ pub struct JillModuleContent {
 
 #[derive(Debug)]
 pub struct JillVariable {
-    // TODO?: use dedicated type?
-    pub name: String,
+    pub name: JillIdentifier,
     pub value: JillExpression,
 }
 
@@ -43,4 +42,9 @@ pub enum JillExpression {
 pub enum JillLiteral {
     Integer(isize),
     String(String),
+}
+
+#[derive(Debug)]
+pub struct JillIdentifier {
+    pub value: String,
 }

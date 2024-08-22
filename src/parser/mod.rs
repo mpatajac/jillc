@@ -41,6 +41,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
     let variable = text::keyword("let")
         .ignore_then(identifier)
+        .map(|name| JillIdentifier { value: name })
         .then_ignore(just('='))
         .then(expression.clone())
         .map(|(name, value)| JillVariable { name, value });
