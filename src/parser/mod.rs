@@ -40,11 +40,38 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
     let literal = integer.or(string).map(JillExpression::Literal);
 
-
-    let expression = literal.or(variable_name).padded();
     let identifier = text::ident().padded().map(JillIdentifier);
 
     let variable_name = identifier.map(JillExpression::VariableName);
+
+    // ( :: | ( mod_name:: )+ )
+    let local_module_path = just("::").to(Vec::new());
+    let modules_path = identifier
+        .then_ignore(just("::"))
+        .repeated()
+        .at_least(1)
+        .or(local_module_path);
+
+    let associated_type = identifier.then_ignore(just(":"));
+    let function_name = identifier;
+    let function_reference = modules_path
+        .then(associated_type.or_not())
+        .then(function_name)
+        .map(
+            |((modules_path, associated_type), function_name)| JillFunctionReference {
+                modules_path,
+                associated_type,
+                function_name,
+            },
+        );
+
+    // since there is possible ambiguity here, order in which the
+    // options are listed is important (most specific => least specific)
+    let expression = literal
+        .or(function_reference.map(JillExpression::FunctionReference))
+        .or(variable_name)
+        .padded();
+
     let variable = text::keyword("let")
         .ignore_then(identifier)
         .then_ignore(just('='))

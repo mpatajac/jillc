@@ -43,8 +43,9 @@ pub struct JillFunction {
 #[derive(Debug)]
 pub enum JillExpression {
     Literal(JillLiteral),
+    // TODO?: differentiate function call types (full, type, local, variable)
     // FunctionCall(??),
-    // FunctionReference(??),
+    FunctionReference(JillFunctionReference),
     VariableName(JillIdentifier),
 }
 
@@ -53,6 +54,13 @@ pub struct JillFunctionBody {
     pub local_functions: Vec<JillFunction>,
     pub local_variables: Vec<JillVariable>,
     pub return_expression: JillExpression,
+}
+
+#[derive(Debug)]
+pub struct JillFunctionReference {
+    pub modules_path: Vec<JillIdentifier>,
+    pub associated_type: Option<JillIdentifier>,
+    pub function_name: JillIdentifier,
 }
 
 // endregion
