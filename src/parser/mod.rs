@@ -23,8 +23,13 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
 
 /// Construct the parser for a Jill program module (file).
 fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let integer = text::int(10)
-        .map(|s: String| s.parse().expect("should be a valid integer"))
+    let positive_integer =
+        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid integer"));
+
+    let negation_sign = just('-').or_not();
+    let integer = negation_sign
+        .then(positive_integer)
+        .map(|(sign, number)| if sign.is_some() { -number } else { number })
         .map(JillLiteral::Integer);
 
     let string = just('"')
