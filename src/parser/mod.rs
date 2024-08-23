@@ -110,16 +110,9 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
     let function = recursive(|function| {
         let function_body = function
-            .separated_by(just('.'))
-            .allow_trailing()
-            .padded()
-            .then(
-                variable
-                    .clone()
-                    .separated_by(just(','))
-                    .allow_trailing()
-                    .padded(),
-            )
+            .then_ignore(just('.'))
+            .repeated()
+            .then(variable.clone().then_ignore(just(',')).repeated())
             .then(expression)
             .padded()
             .map(
@@ -144,9 +137,9 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     });
 
     let module = variable
-        .separated_by(just('.'))
-        .allow_trailing()
-        .then(function.separated_by(just('.')).allow_trailing())
+        .then_ignore(just('.'))
+        .repeated()
+        .then(function.then_ignore(just('.')).repeated())
         .padded()
         .map(|(variables, functions)| JillModuleContent {
             variables,
