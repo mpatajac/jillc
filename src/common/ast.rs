@@ -18,14 +18,14 @@ pub struct JillModule {
 
 #[derive(Debug)]
 pub struct JillModuleContent {
+    // `type`
+    pub types: Vec<JillType>,
+
     // `let`
     pub variables: Vec<JillVariable>,
 
     // `fn`
     pub functions: Vec<JillFunction>,
-
-    // `type`
-    pub types: Vec<JillType>,
 }
 
 #[derive(Debug)]
