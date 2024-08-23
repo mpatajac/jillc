@@ -23,8 +23,9 @@ pub struct JillModuleContent {
 
     // `fn`
     pub functions: Vec<JillFunction>,
+
     // `type`
-    // pub types: Vec<JillType>,
+    pub types: Vec<JillType>,
 }
 
 #[derive(Debug)]
@@ -38,6 +39,18 @@ pub struct JillFunction {
     pub name: JillIdentifier,
     pub arguments: Vec<JillIdentifier>,
     pub body: JillFunctionBody,
+}
+
+#[derive(Debug)]
+pub struct JillType {
+    pub name: JillIdentifier,
+    pub variants: Vec<JillTypeVariant>,
+}
+
+#[derive(Debug)]
+pub struct JillTypeVariant {
+    pub name: JillIdentifier,
+    pub arguments: Vec<JillIdentifier>,
 }
 
 #[derive(Debug)]

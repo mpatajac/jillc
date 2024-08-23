@@ -141,16 +141,38 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             })
     });
 
-    let module = variable
+    let variant = identifier
+        .then(
+            identifier
+                .separated_by(just(','))
+                .allow_trailing()
+                .delimited_by(just('('), just(')'))
+                .or_not(),
+        )
+        .map(|(name, arguments)| JillTypeVariant {
+            name,
+            arguments: arguments.unwrap_or(Vec::new()),
+        });
+
+    let r#type = text::keyword("type")
+        .ignore_then(identifier)
+        .then_ignore(just('='))
+        .then(variant.separated_by(just(',')))
+        .padded()
+        .padded_by(comments)
+        .map(|(name, variants)| JillType { name, variants });
+
+    let module = r#type
         .then_ignore(just('.'))
         .repeated()
+        .then(variable.then_ignore(just('.')).repeated())
         .then(function.then_ignore(just('.')).repeated())
         .padded()
-        .map(|(variables, functions)| JillModuleContent {
+        .map(|((types, variables), functions)| JillModuleContent {
+            types,
             variables,
             functions,
         });
 
-    // TODO: figure out how exactly this needs to be set
     module.then_ignore(end())
 }
