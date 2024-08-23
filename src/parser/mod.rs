@@ -42,6 +42,9 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
     let identifier = text::ident().padded().map(JillIdentifier);
 
+    let comment = just("--").then(take_until(text::newline()));
+    let comments = comment.repeated().padded().ignored();
+
     let expression = recursive(|expression| {
         let literal = integer.or(string).map(JillExpression::Literal);
 
@@ -106,6 +109,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
         .then_ignore(just('='))
         .then(expression.clone())
         .padded()
+        .padded_by(comments)
         .map(|(name, value)| JillVariable { name, value });
 
     let function = recursive(|function| {
@@ -129,6 +133,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             .then_ignore(just('='))
             .then(function_body)
             .padded()
+            .padded_by(comments)
             .map(|((name, arguments), body)| JillFunction {
                 name,
                 arguments,
