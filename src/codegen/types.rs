@@ -250,4 +250,75 @@ mod tests {
 
         assert_eq!(module_context.output.compile(), expected);
     }
+
+    #[test]
+    fn test_types_option() {
+        // setup
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Option"));
+
+        // type Option = None, Some(value).
+        let types = vec![ast::JillType {
+            name: ast::JillIdentifier(String::from("Option")),
+            variants: vec![
+                ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("None")),
+                    fields: vec![],
+                },
+                ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("Some")),
+                    fields: vec![ast::JillIdentifier(String::from("value"))],
+                },
+            ],
+        }];
+
+        let none_ctor = vec![
+            "function Option.None 0",
+            "push constant 1",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push constant 0",
+            "pop this 0",
+            "push pointer 0",
+            "return",
+        ];
+
+        let some_ctor = vec![
+            "function Option.Some 0",
+            "push constant 2",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 0",
+            "push constant 1",
+            "pop this 1",
+            "push pointer 0",
+            "return",
+        ];
+
+        let some_get_value = vec![
+            "function Option.Some_value 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let some_update_value = vec![
+            "function Option.Some_updateValue 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "call Option.Some 1",
+            "return",
+        ];
+
+        let expected = [none_ctor, some_ctor, some_get_value, some_update_value]
+            .concat()
+            .join("\n");
+
+        construct(types, &mut module_context, &mut program_context);
+
+        assert_eq!(module_context.output.compile(), expected);
+    }
 }
