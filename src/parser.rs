@@ -149,9 +149,9 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
                 .delimited_by(just('('), just(')'))
                 .or_not(),
         )
-        .map(|(name, arguments)| JillTypeVariant {
+        .map(|(name, fields)| JillTypeVariant {
             name,
-            arguments: arguments.unwrap_or(Vec::new()),
+            fields: fields.unwrap_or(Vec::new()),
         });
 
     let r#type = text::keyword("type")
