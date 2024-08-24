@@ -93,7 +93,8 @@ mod variant {
         program_context: &mut ProgramContext,
     ) {
         for (i, field) in variant.fields.iter().enumerate() {
-            let function_name = format!("{}.{}", module_context.module_name, field);
+            let function_name =
+                format!("{}.{}_{}", module_context.module_name, variant.name, field);
 
             let output_block = vec![
                 vm::function(function_name, 0),
@@ -117,8 +118,9 @@ mod variant {
 
         for (variant_index, field) in variant.fields.iter().enumerate() {
             let function_name = format!(
-                "{}.update{}",
+                "{}.{}_update{}",
                 module_context.module_name,
+                variant.name,
                 field.0.to_title_case()
             );
 
@@ -176,6 +178,8 @@ mod tests {
         // setup
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new(String::from("Bar"));
+
+        // type Bar = Bar(foo1, foo2).
         let types = vec![ast::JillType {
             name: ast::JillIdentifier(String::from("Bar")),
             variants: vec![ast::JillTypeVariant {
@@ -203,7 +207,7 @@ mod tests {
         ];
 
         let get_foo1 = vec![
-            "function Bar.foo1 0",
+            "function Bar.Bar_foo1 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
@@ -211,7 +215,7 @@ mod tests {
         ];
 
         let get_foo2 = vec![
-            "function Bar.foo2 0",
+            "function Bar.Bar_foo2 0",
             "push argument 0",
             "pop pointer 0",
             "push this 1",
@@ -219,7 +223,7 @@ mod tests {
         ];
 
         let update_foo1 = vec![
-            "function Bar.updateFoo1 0",
+            "function Bar.Bar_updateFoo1 0",
             "push argument 0",
             "pop pointer 0",
             "push argument 1",
@@ -229,7 +233,7 @@ mod tests {
         ];
 
         let update_foo2 = vec![
-            "function Bar.updateFoo2 0",
+            "function Bar.Bar_updateFoo2 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
