@@ -5,6 +5,7 @@ use context::{ModuleContext, ProgramContext};
 
 use crate::common::ast;
 
+mod common;
 pub mod context;
 mod types;
 mod vm;

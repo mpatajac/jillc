@@ -70,6 +70,12 @@ impl From<&[VMInstruction]> for VMInstructionBlock {
     }
 }
 
+impl VMInstructionBlock {
+    pub fn compile(self) -> String {
+        self.to_string()
+    }
+}
+
 // endregion
 
 // region: VMInstruction
