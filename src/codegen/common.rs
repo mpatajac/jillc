@@ -16,6 +16,7 @@ mod literal {
         match literal {
             ast::JillLiteral::Integer(i) => construct_integer(i),
             ast::JillLiteral::String(s) => construct_string(s),
+            ast::JillLiteral::Bool(b) => construct_bool(b),
         }
     }
 
@@ -46,6 +47,18 @@ mod literal {
             .collect();
 
         [string_init, string_population].concat().into()
+    }
+
+    pub(super) fn construct_bool(b: &bool) -> vm::VMInstructionBlock {
+        if *b {
+            vec![
+                vm::push(vm::Segment::Constant, 1),
+                vm::command(vm::VMCommand::Neg),
+            ]
+        } else {
+            vec![vm::push(vm::Segment::Constant, 0)]
+        }
+        .into()
     }
 
     fn to_ascii(c: char) -> usize {

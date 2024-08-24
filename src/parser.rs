@@ -40,13 +40,18 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
         .map(|chars| chars.into_iter().collect())
         .map(JillLiteral::String);
 
+    let boolean = just("True")
+        .or(just("False"))
+        .map(|b| b == "True")
+        .map(JillLiteral::Bool);
+
     let identifier = text::ident().padded().map(JillIdentifier);
 
     let comment = just("--").then(take_until(text::newline()));
     let comments = comment.repeated().padded().ignored();
 
     let expression = recursive(|expression| {
-        let literal = integer.or(string).map(JillExpression::Literal);
+        let literal = integer.or(string).or(boolean).map(JillExpression::Literal);
 
         let variable_name = identifier;
 

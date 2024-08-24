@@ -90,6 +90,7 @@ pub struct JillFunctionCall {
 pub enum JillLiteral {
     Integer(isize),
     String(String),
+    Bool(bool),
 }
 
 #[derive(Debug, Clone)]
