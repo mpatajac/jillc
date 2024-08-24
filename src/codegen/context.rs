@@ -7,11 +7,32 @@ pub mod module {
     pub struct Context {
         pub module_name: String,
         // TODO: scope (funcs | vars)
+        pub type_info: TypeInfo,
+        pub output_blocks: Vec<String>,
     }
 
     impl Context {
         pub const fn new(module_name: String) -> Self {
-            Self { module_name }
+            Self {
+                module_name,
+                type_info: TypeInfo::new(),
+                output_blocks: Vec::new(),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct TypeInfo {
+        pub is_multivariant: bool,
+        pub current_variant: usize,
+    }
+
+    impl TypeInfo {
+        pub const fn new() -> Self {
+            Self {
+                is_multivariant: false,
+                current_variant: 0,
+            }
         }
     }
 }
