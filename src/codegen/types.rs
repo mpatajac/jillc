@@ -45,6 +45,8 @@ fn construct_match(
 }
 
 mod variant {
+    use crate::codegen::vm::{self, Segment, VMCommand};
+
     use super::{ast, ModuleContext, ProgramContext};
 
     pub(super) fn construct(
@@ -69,31 +71,31 @@ mod variant {
         let variant_tag = module_context.type_info.current_variant;
         let function_name = format!("{}.{}", module_context.module_name, variant.name);
 
-        let assignment = |idx: usize| {
-            // TODO!: create VM "primitives" (push/pop/call..., segments etc.),
-            // each with appropriate String mapping
-            format!("push argument {idx}\npop this {idx}")
-        };
+        let field_assignment =
+            |i: usize| vec![vm::push(Segment::Argument, i), vm::pop(Segment::This, i)];
 
         let assignments = (0..variant.fields.len())
-            .map(assignment)
-            .collect::<Vec<_>>()
-            .join("\n");
+            .flat_map(field_assignment)
+            .collect::<Vec<_>>();
 
-        let output = format!(
-            "function {function_name} 0
-push constant {number_of_fields}
-call Memory.alloc 1
-pop pointer 0
-{assignments}
-push constant {variant_tag}
-pop this {variant_tag_idx}
-push pointer 0
-return",
-            variant_tag_idx = number_of_fields - 1
-        );
+        let output_block = [
+            vec![
+                vm::function(function_name, 0),
+                vm::push(Segment::Constant, number_of_fields),
+                vm::call("Memory.alloc", 1),
+                vm::pop(Segment::Pointer, 0),
+            ],
+            assignments,
+            vec![
+                vm::push(Segment::Constant, variant_tag),
+                vm::pop(Segment::This, number_of_fields - 1),
+                vm::push(Segment::Pointer, 0),
+                vm::command(VMCommand::Return),
+            ],
+        ]
+        .concat();
 
-        module_context.output_blocks.push(output);
+        module_context.output.add_block(output_block.into());
     }
 }
 
@@ -118,22 +120,24 @@ mod tests {
             }],
         }];
 
-        let expected = "function Bar.Bar 0
-push constant 3
-call Memory.alloc 1
-pop pointer 0
-push argument 0
-pop this 0
-push argument 1
-pop this 1
-push constant 0
-pop this 2
-push pointer 0
-return"
-            .trim();
+        let expected = [
+            "function Bar.Bar 0",
+            "push constant 3",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 0",
+            "push argument 1",
+            "pop this 1",
+            "push constant 0",
+            "pop this 2",
+            "push pointer 0",
+            "return",
+        ]
+        .join("\n");
 
         construct(types, &mut module_context, &mut program_context);
 
-        assert_eq!(module_context.output_blocks, vec![expected]);
+        assert_eq!(module_context.output.compile(), expected);
     }
 }

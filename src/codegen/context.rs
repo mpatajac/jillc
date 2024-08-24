@@ -2,13 +2,15 @@ pub use module::Context as ModuleContext;
 pub use program::Context as ProgramContext;
 
 pub mod module {
+    use crate::codegen::vm;
+
     /// Context information regarding the current module.
     #[derive(Debug)]
     pub struct Context {
         pub module_name: String,
         // TODO: scope (funcs | vars)
         pub type_info: TypeInfo,
-        pub output_blocks: Vec<String>,
+        pub output: vm::VMModule,
     }
 
     impl Context {
@@ -16,7 +18,7 @@ pub mod module {
             Self {
                 module_name,
                 type_info: TypeInfo::new(),
-                output_blocks: Vec::new(),
+                output: vm::VMModule::new(),
             }
         }
     }

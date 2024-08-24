@@ -7,6 +7,7 @@ use crate::common::ast;
 
 pub mod context;
 mod types;
+mod vm;
 
 pub fn construct_module(module: ast::JillModule, program_context: &mut ProgramContext) -> String {
     let mut module_context = ModuleContext::new(module.name);
@@ -16,5 +17,5 @@ pub fn construct_module(module: ast::JillModule, program_context: &mut ProgramCo
     // TODO: lets (globals)
     // TODO: fns
 
-    module_context.output_blocks.join("\n")
+    module_context.output.compile()
 }
