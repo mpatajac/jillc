@@ -97,6 +97,9 @@ mod tests {
         fn_dispatch.encounter(String::from("foo"));
         fn_dispatch.encounter(String::from("baz"));
         fn_dispatch.encounter(String::from("biz"));
+        fn_dispatch.encounter(String::from("bar"));
+        fn_dispatch.encounter(String::from("foo"));
+        fn_dispatch.encounter(String::from("baz"));
         fn_dispatch.encounter(String::from("foo"));
         fn_dispatch.encounter(String::from("baz"));
 
