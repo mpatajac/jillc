@@ -30,9 +30,11 @@ fn construct_type(
 }
 
 mod variant {
-    use crate::codegen::vm::{self, Segment, VMCommand};
+    use crate::codegen::vm::{self, Segment};
 
     use super::{ast, ModuleContext, ProgramContext};
+
+    use heck::ToTitleCase;
 
     pub(super) fn construct(
         variant: ast::JillTypeVariant,
@@ -41,8 +43,9 @@ mod variant {
     ) {
         construct_ctor(&variant, module_context, program_context);
 
+        // TODO?: only generate if requested (`with get|update|eq|...`)
         construct_accessors(&variant, module_context, program_context);
-        // TODO: construct_updaters?
+        construct_updaters(&variant, module_context, program_context);
     }
 
     fn construct_ctor(
@@ -50,11 +53,12 @@ mod variant {
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) {
-        // listed fields + tag
-        let number_of_fields = variant.fields.len() + 1;
+        let number_of_fields = number_of_fields(variant);
 
         let variant_tag = module_context.type_info.current_variant;
-        let function_name = format!("{}.{}", module_context.module_name, variant.name);
+        let function_name = ctor_name(variant, module_context);
+
+        let tag_index = tag_index(variant);
 
         let field_assignment =
             |i: usize| vec![vm::push(Segment::Argument, i), vm::pop(Segment::This, i)];
@@ -73,7 +77,7 @@ mod variant {
             assignments,
             vec![
                 vm::push(Segment::Constant, variant_tag),
-                vm::pop(Segment::This, number_of_fields - 1),
+                vm::pop(Segment::This, tag_index),
                 vm::push(Segment::Pointer, 0),
                 vm::vm_return(),
             ],
@@ -101,6 +105,64 @@ mod variant {
 
             module_context.output.add_block(output_block.into());
         }
+    }
+
+    fn construct_updaters(
+        variant: &ast::JillTypeVariant,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) {
+        let ctor_name = ctor_name(variant, module_context);
+        let ctor_argument_count = variant.fields.len();
+
+        for (variant_index, field) in variant.fields.iter().enumerate() {
+            let function_name = format!(
+                "{}.update{}",
+                module_context.module_name,
+                field.0.to_title_case()
+            );
+
+            let ctor_arg_mapping = |i| {
+                if i == variant_index {
+                    // field that needs to be updated => push passed value
+                    vm::push(Segment::Argument, 1)
+                } else {
+                    // other fields => push existing field value
+                    vm::push(Segment::This, i)
+                }
+            };
+
+            let ctor_args = (0..variant.fields.len())
+                .map(ctor_arg_mapping)
+                .collect::<Vec<_>>();
+
+            let output_block = [
+                vec![
+                    vm::function(function_name, 0),
+                    vm::push(Segment::Argument, 0),
+                    vm::pop(Segment::Pointer, 0),
+                ],
+                ctor_args,
+                vec![vm::call(&ctor_name, ctor_argument_count), vm::vm_return()],
+            ]
+            .concat();
+
+            module_context.output.add_block(output_block.into());
+        }
+    }
+
+    fn ctor_name(variant: &ast::JillTypeVariant, module_context: &ModuleContext) -> String {
+        format!("{}.{}", module_context.module_name, variant.name)
+    }
+
+    fn number_of_fields(variant: &ast::JillTypeVariant) -> usize {
+        // listed fields + tag
+        variant.fields.len() + 1
+    }
+
+    fn tag_index(variant: &ast::JillTypeVariant) -> usize {
+        // last item
+        number_of_fields(variant) - 1
     }
 }
 
@@ -156,7 +218,29 @@ mod tests {
             "return",
         ];
 
-        let expected = [ctor, get_foo1, get_foo2].concat().join("\n");
+        let update_foo1 = vec![
+            "function Bar.updateFoo1 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "push this 1",
+            "call Bar.Bar 2",
+            "return",
+        ];
+
+        let update_foo2 = vec![
+            "function Bar.updateFoo2 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "push argument 1",
+            "call Bar.Bar 2",
+            "return",
+        ];
+
+        let expected = [ctor, get_foo1, get_foo2, update_foo1, update_foo2]
+            .concat()
+            .join("\n");
 
         construct(types, &mut module_context, &mut program_context);
 
