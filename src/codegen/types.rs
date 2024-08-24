@@ -8,7 +8,7 @@ pub fn construct(
     program_context: &mut ProgramContext,
 ) {
     for jill_type in types {
-        // re-set stored type info
+        // reset stored type info
         module_context.type_info = context::module::TypeInfo::new();
 
         construct_type(jill_type, module_context, program_context);
@@ -20,28 +20,13 @@ fn construct_type(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) {
-    module_context.type_info.is_multivariant = jill_type.variants.len() > 1;
     module_context.type_info.current_variant = 0;
-
-    if module_context.type_info.is_multivariant {
-        // TODO: do we actually use a dedicated `match` function
-        // or is everything handled in the "call"?
-        construct_match(&jill_type, module_context, program_context);
-    }
 
     for variant in jill_type.variants {
         variant::construct(variant, module_context, program_context);
 
         module_context.type_info.current_variant += 1;
     }
-}
-
-fn construct_match(
-    jill_type: &ast::JillType,
-    module_context: &mut ModuleContext,
-    program_context: &mut ProgramContext,
-) {
-    todo!()
 }
 
 mod variant {

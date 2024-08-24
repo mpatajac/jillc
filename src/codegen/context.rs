@@ -25,16 +25,12 @@ pub mod module {
 
     #[derive(Debug)]
     pub struct TypeInfo {
-        pub is_multivariant: bool,
         pub current_variant: usize,
     }
 
     impl TypeInfo {
         pub const fn new() -> Self {
-            Self {
-                is_multivariant: false,
-                current_variant: 0,
-            }
+            Self { current_variant: 0 }
         }
     }
 }
