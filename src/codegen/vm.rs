@@ -91,6 +91,11 @@ pub fn command(command: VMCommand) -> VMInstruction {
     VMInstruction::Command(command)
 }
 
+/// Utility function for the `return` VM instruction.
+pub fn vm_return() -> VMInstruction {
+    VMInstruction::Command(VMCommand::Return)
+}
+
 /// Utility function for the `label` VM instruction.
 pub fn label<S: Into<String>>(label_action: LabelAction, label: S) -> VMInstruction {
     VMInstruction::Label(label_action, label.into())

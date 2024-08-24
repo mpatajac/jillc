@@ -41,7 +41,7 @@ mod variant {
     ) {
         construct_ctor(&variant, module_context, program_context);
 
-        // TODO: construct_accessors
+        construct_accessors(&variant, module_context, program_context);
         // TODO: construct_updaters?
     }
 
@@ -75,12 +75,32 @@ mod variant {
                 vm::push(Segment::Constant, variant_tag),
                 vm::pop(Segment::This, number_of_fields - 1),
                 vm::push(Segment::Pointer, 0),
-                vm::command(VMCommand::Return),
+                vm::vm_return(),
             ],
         ]
         .concat();
 
         module_context.output.add_block(output_block.into());
+    }
+
+    fn construct_accessors(
+        variant: &ast::JillTypeVariant,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) {
+        for (i, field) in variant.fields.iter().enumerate() {
+            let function_name = format!("{}.{}", module_context.module_name, field);
+
+            let output_block = vec![
+                vm::function(function_name, 0),
+                vm::push(Segment::Argument, 0),
+                vm::pop(Segment::Pointer, 0),
+                vm::push(Segment::This, i),
+                vm::vm_return(),
+            ];
+
+            module_context.output.add_block(output_block.into());
+        }
     }
 }
 
@@ -90,7 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_types_single_ctor() {
+    fn test_types_single_variant() {
         // setup
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new(String::from("Bar"));
@@ -105,7 +125,7 @@ mod tests {
             }],
         }];
 
-        let expected = [
+        let ctor = vec![
             "function Bar.Bar 0",
             "push constant 3",
             "call Memory.alloc 1",
@@ -118,8 +138,25 @@ mod tests {
             "pop this 2",
             "push pointer 0",
             "return",
-        ]
-        .join("\n");
+        ];
+
+        let get_foo1 = vec![
+            "function Bar.foo1 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let get_foo2 = vec![
+            "function Bar.foo2 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 1",
+            "return",
+        ];
+
+        let expected = [ctor, get_foo1, get_foo2].concat().join("\n");
 
         construct(types, &mut module_context, &mut program_context);
 
