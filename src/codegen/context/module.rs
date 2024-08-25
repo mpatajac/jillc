@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::codegen::vm;
+use crate::codegen::{
+    self,
+    error::{Error, FallableAction},
+    vm,
+};
 
 // region: Context
 
@@ -79,17 +83,30 @@ impl Scope {
 
     /// Add a new function to the (latest frame of the) scope.
     /// This is usually performed after a function definition.
-    pub fn add_function(&mut self, name: Name, context: FunctionContext) {
-        // TODO?: check for a variable (or a function?) with the same name
-        self.last_frame().functions.insert(name, context);
+    pub fn add_function(&mut self, name: Name, context: FunctionContext) -> FallableAction {
+        // check for existing functions/variables with the same name (to prevent shadowing)
+        match self.search(&name) {
+            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
+            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
+            ScopeSearchOutcome::NotFound => {
+                self.last_frame().functions.insert(name, context);
+                Ok(())
+            }
+        }
     }
 
     /// Add a new variable to the (latest frame of the) scope.
     /// This is usually performed after a variable definition.
-    pub fn add_variable(&mut self, name: Name, context: VariableContext) {
-        // TODO?: check for a function with the same name
-        // TODO: what to do with variable shadowing?
-        self.last_frame().variables.insert(name, context);
+    pub fn add_variable(&mut self, name: Name, context: VariableContext) -> FallableAction {
+        // check for existing functions/variables with the same name (to prevent shadowing)
+        match self.search(&name) {
+            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
+            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
+            ScopeSearchOutcome::NotFound => {
+                self.last_frame().variables.insert(name, context);
+                Ok(())
+            }
+        }
     }
 
     /// Returns the last (latest, currently active) scope frame.
