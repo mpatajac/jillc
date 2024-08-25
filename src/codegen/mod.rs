@@ -7,6 +7,7 @@ use crate::common::ast;
 
 mod common;
 pub mod context;
+pub mod error;
 mod types;
 mod vm;
 
