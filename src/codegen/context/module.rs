@@ -52,16 +52,16 @@ pub struct Scope {
     frames: Vec<ScopeFrame>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScopeSearchOutcome {
     NotFound,
     Variable(VariableContext),
     Function(FunctionContext),
 }
 
-impl Scope {
-    // TODO: test `Scope` framework
+type Name = String;
 
+impl Scope {
     pub fn new() -> Self {
         Self {
             // initialize with the module-level scope
@@ -137,7 +137,6 @@ impl Scope {
     }
 }
 
-type Name = String;
 #[derive(Debug)]
 pub struct ScopeFrame {
     functions: HashMap<Name, FunctionContext>,
@@ -153,16 +152,165 @@ impl ScopeFrame {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContext {
-    number_of_arguments: usize,
+    pub number_of_arguments: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VariableContext {
     // TODO?: separate variables by segments?
-    segment: vm::Segment,
-    index: usize,
+    pub segment: vm::Segment,
+    pub index: usize,
 }
 
 // endregion
+
+#[cfg(test)]
+mod tests {
+    use crate::codegen::{self, vm};
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_scope() {
+        let mut scope = super::Scope::new();
+
+        assert!(scope
+            .add_variable(
+                "foo".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Static,
+                    index: 0,
+                },
+            )
+            .is_ok());
+
+        assert!(scope
+            .add_function(
+                "f".to_string(),
+                super::FunctionContext {
+                    number_of_arguments: 2
+                },
+            )
+            .is_ok());
+
+        // fn f a b = _.
+        scope.add_frame();
+
+        assert!(scope
+            .add_variable(
+                "a".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Argument,
+                    index: 0,
+                },
+            )
+            .is_ok());
+
+        assert!(scope
+            .add_variable(
+                "b".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Argument,
+                    index: 1,
+                },
+            )
+            .is_ok());
+
+        scope.drop_frame();
+
+        assert!(scope
+            .add_function(
+                "g".to_string(),
+                super::FunctionContext {
+                    number_of_arguments: 1
+                },
+            )
+            .is_ok());
+
+        // fn g x = ...
+        scope.add_frame();
+
+        assert!(scope
+            .add_variable(
+                "x".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Argument,
+                    index: 0,
+                },
+            )
+            .is_ok());
+
+        // nested function
+        assert!(scope
+            .add_function(
+                "baz".to_string(),
+                super::FunctionContext {
+                    number_of_arguments: 1
+                },
+            )
+            .is_ok());
+
+        // fn baz a = _.
+        scope.add_frame();
+
+        // `a` already existed, but it was defined in previous function,
+        // so by now it should have gone out of scope
+        assert!(scope
+            .add_variable(
+                "a".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Local,
+                    index: 0,
+                },
+            )
+            .is_ok());
+
+        scope.drop_frame();
+
+        // variable local to the `fn g` scope
+        assert!(scope
+            .add_variable(
+                "bar".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Local,
+                    index: 0,
+                },
+            )
+            .is_ok());
+
+        assert!(matches!(
+            scope.search(&"f".to_string()),
+            super::ScopeSearchOutcome::Function(super::FunctionContext {
+                number_of_arguments
+            })
+        ));
+
+        assert!(matches!(
+            scope.search(&"bar".to_string()),
+            super::ScopeSearchOutcome::Variable(super::VariableContext { segment, index })
+        ));
+
+        assert!(matches!(
+            scope.search(&"jill".to_string()),
+            super::ScopeSearchOutcome::NotFound
+        ));
+
+        // occured twice, but went out of scope both times
+        assert!(matches!(
+            scope.search(&"a".to_string()),
+            super::ScopeSearchOutcome::NotFound
+        ));
+
+        // variable with a same name already exists (global)
+        assert!(scope
+            .add_variable(
+                "foo".to_string(),
+                super::VariableContext {
+                    segment: vm::Segment::Local,
+                    index: 1,
+                },
+            )
+            .is_err_and(|err| matches!(err, codegen::error::Error::VariableAlreadyInScope(_))));
+    }
+}

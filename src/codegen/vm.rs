@@ -124,7 +124,7 @@ type Label = String;
 type Count = usize;
 type FunctionName = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VMInstruction {
     Push(Segment, Index),
     Pop(Segment, Index),
@@ -157,7 +157,7 @@ impl std::fmt::Display for VMInstruction {
     }
 }
 
-#[derive(Debug, strum::Display, Clone)]
+#[derive(Debug, strum::Display, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum VMCommand {
     Add,
@@ -172,7 +172,7 @@ pub enum VMCommand {
     Return,
 }
 
-#[derive(Debug, strum::Display, Clone)]
+#[derive(Debug, strum::Display, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum LabelAction {
     Label,
@@ -180,7 +180,7 @@ pub enum LabelAction {
     IfGoto,
 }
 
-#[derive(Debug, strum::Display, Clone)]
+#[derive(Debug, strum::Display, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Segment {
     Local,
