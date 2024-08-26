@@ -25,12 +25,12 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
 #[allow(clippy::too_many_lines)]
 /// Construct the parser for a Jill program module (file).
 fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let positive_integer =
-        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid integer"));
+    let number =
+        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
 
     let negation_sign = just('-').or_not();
     let integer = negation_sign
-        .then(positive_integer)
+        .then(number)
         .map(|(sign, number)| if sign.is_some() { -number } else { number })
         .map(JillLiteral::Integer);
 
