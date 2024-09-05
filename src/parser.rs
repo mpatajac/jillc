@@ -63,14 +63,7 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
                 );
 
             function_call_source
-                .then(
-                    expression
-                        .clone()
-                        .separated_by(just(','))
-                        .allow_trailing()
-                        .padded()
-                        .delimited_by(just('('), just(')')),
-                )
+                .then(nested_expression_list(expression.clone()).delimited_by(just('('), just(')')))
                 .map(|(reference, arguments)| JillFunctionCall {
                     reference,
                     arguments,
@@ -145,6 +138,12 @@ fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clo
     comment.padded().repeated().ignored()
 }
 
+fn nested_expression_list(
+    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, Vec<JillExpression>, Error = JillParseError> + std::clone::Clone {
+    expression.separated_by(just(',')).allow_trailing().padded()
+}
+
 fn literal(
     expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
 ) -> impl Parser<char, JillLiteral, Error = JillParseError> {
@@ -172,10 +171,7 @@ fn literal(
         .map(JillLiteral::Bool);
 
     // list
-    let list = expression
-        .separated_by(just(','))
-        .allow_trailing()
-        .padded()
+    let list = nested_expression_list(expression)
         .delimited_by(just('['), just(']'))
         .map(JillLiteral::List);
 
