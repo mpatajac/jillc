@@ -189,17 +189,26 @@ fn variable() -> impl Parser<char, JillVariable, Error = JillParseError> {
 }
 
 fn function() -> impl Parser<char, JillFunction, Error = JillParseError> {
+    let captured_arguments = identifier()
+        .repeated()
+        // require at least one captured argument if brackets are present
+        .at_least(1)
+        .delimited_by(just('['), just(']'))
+        .padded();
+
     recursive(|function| {
         text::keyword("fn")
             .ignore_then(identifier())
             .then(identifier().repeated())
+            .then(captured_arguments.or_not())
             .then_ignore(just('='))
             .then(function_body(function))
             .padded()
             .padded_by(comments())
-            .map(|((name, arguments), body)| JillFunction {
+            .map(|(((name, arguments), captures), body)| JillFunction {
                 name,
                 arguments,
+                captures: captures.unwrap_or(vec![]),
                 body,
             })
     })

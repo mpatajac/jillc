@@ -38,6 +38,7 @@ pub struct JillVariable {
 pub struct JillFunction {
     pub name: JillIdentifier,
     pub arguments: Vec<JillIdentifier>,
+    pub captures: Vec<JillIdentifier>,
     pub body: JillFunctionBody,
 }
 
