@@ -141,7 +141,7 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
 fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clone {
     let comment = just("--").then(take_until(text::newline()));
-    comment.repeated().padded().ignored()
+    comment.padded().repeated().ignored()
 }
 
 fn literal() -> impl Parser<char, JillLiteral, Error = JillParseError> {
