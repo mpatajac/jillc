@@ -28,83 +28,23 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     let expression = recursive(|expression| {
         let variable_name = identifier;
 
-        let modules_path = identifier.then_ignore(just("::")).repeated();
-
-        let associated_type = identifier.then_ignore(just(":"));
-        let function_name = identifier;
-        let fully_qualified_function_name = modules_path
-            .then(associated_type.or_not())
-            .then(function_name);
-
-        let function_reference = just("&")
-            .ignore_then(fully_qualified_function_name)
-            .then_ignore(
-                none_of("(")
-                    .rewind()
-                    .labelled("cannot reference and call a function"),
-            )
-            .map(
-                |((modules_path, associated_type), function_name)| JillFunctionReference {
-                    modules_path,
-                    associated_type,
-                    function_name,
-                },
-            );
-
-        let function_call = {
-            let function_call_source = fully_qualified_function_name
-                .or(variable_name.map(|name| ((vec![], None), name)))
-                .map(
-                    |((modules_path, associated_type), function_name)| JillFunctionReference {
-                        modules_path,
-                        associated_type,
-                        function_name,
-                    },
-                );
-
-            function_call_source
-                .then(nested_expression_list(expression.clone()).delimited_by(just('('), just(')')))
-                .map(|(reference, arguments)| JillFunctionCall {
-                    reference,
-                    arguments,
-                })
-        };
-
         // since there is possible ambiguity here, order in which the
         // options are listed is important (most specific => least specific)
         literal(expression.clone())
             .map(JillExpression::Literal)
-            .or(function_call.map(JillExpression::FunctionCall))
-            .or(function_reference.map(JillExpression::FunctionReference))
+            .or(function_call(identifier, expression, variable_name)
+                .map(JillExpression::FunctionCall))
+            .or(function_reference(identifier).map(JillExpression::FunctionReference))
             .or(variable_name.map(JillExpression::VariableName))
             .padded()
     });
 
     let function = recursive(|function| {
-        let function_body = function
-            .then_ignore(just('.'))
-            .repeated()
-            .then(
-                variable(identifier.clone(), expression.clone())
-                    .clone()
-                    .then_ignore(just(','))
-                    .repeated(),
-            )
-            .then(expression.clone())
-            .padded()
-            .map(
-                |((local_functions, local_variables), return_expression)| JillFunctionBody {
-                    local_functions,
-                    local_variables,
-                    return_expression,
-                },
-            );
-
         text::keyword("fn")
             .ignore_then(identifier)
             .then(identifier.repeated())
             .then_ignore(just('='))
-            .then(function_body)
+            .then(function_body(identifier, expression.clone(), function))
             .padded()
             .padded_by(comments())
             .map(|((name, arguments), body)| JillFunction {
@@ -139,9 +79,26 @@ fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clo
 }
 
 fn nested_expression_list(
-    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
-) -> impl Parser<char, Vec<JillExpression>, Error = JillParseError> + std::clone::Clone {
+    expression: impl Parser<char, JillExpression, Error = JillParseError>,
+) -> impl Parser<char, Vec<JillExpression>, Error = JillParseError> {
     expression.separated_by(just(',')).allow_trailing().padded()
+}
+
+type JillFunctionReferenceComponents = (
+    (Vec<JillIdentifier>, Option<JillIdentifier>),
+    JillIdentifier,
+);
+fn fully_qualified_function_name(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, JillFunctionReferenceComponents, Error = JillParseError> {
+    let modules_path = identifier.clone().then_ignore(just("::")).repeated();
+
+    let associated_type = identifier.clone().then_ignore(just(":"));
+    let function_name = identifier;
+
+    modules_path
+        .then(associated_type.or_not())
+        .then(function_name)
 }
 
 fn literal(
@@ -176,6 +133,73 @@ fn literal(
         .map(JillLiteral::List);
 
     integer.or(string).or(boolean).or(list)
+}
+
+fn function_reference(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, JillFunctionReference, Error = JillParseError> {
+    just("&")
+        .ignore_then(fully_qualified_function_name(identifier))
+        .then_ignore(
+            none_of("(")
+                .rewind()
+                .labelled("cannot reference and call a function"),
+        )
+        .map(
+            |((modules_path, associated_type), function_name)| JillFunctionReference {
+                modules_path,
+                associated_type,
+                function_name,
+            },
+        )
+}
+
+fn function_call(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+    expression: impl Parser<char, JillExpression, Error = JillParseError>,
+    variable_name: impl Parser<char, JillIdentifier, Error = JillParseError>,
+) -> impl Parser<char, JillFunctionCall, Error = JillParseError> {
+    let function_call_source = fully_qualified_function_name(identifier)
+        .or(variable_name.map(|name| ((vec![], None), name)))
+        .map(
+            |((modules_path, associated_type), function_name)| JillFunctionReference {
+                modules_path,
+                associated_type,
+                function_name,
+            },
+        );
+
+    function_call_source
+        .then(nested_expression_list(expression).delimited_by(just('('), just(')')))
+        .map(|(reference, arguments)| JillFunctionCall {
+            reference,
+            arguments,
+        })
+}
+
+fn function_body(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
+    nested_function: impl Parser<char, JillFunction, Error = JillParseError>,
+) -> impl Parser<char, JillFunctionBody, Error = JillParseError> {
+    nested_function
+        .then_ignore(just('.'))
+        .repeated()
+        .then(
+            variable(identifier, expression.clone())
+                .clone()
+                .then_ignore(just(','))
+                .repeated(),
+        )
+        .then(expression)
+        .padded()
+        .map(
+            |((local_functions, local_variables), return_expression)| JillFunctionBody {
+                local_functions,
+                local_variables,
+                return_expression,
+            },
+        )
 }
 
 fn variable(
