@@ -8,7 +8,7 @@ use chumsky::prelude::*;
 use crate::fileio::input::SourceFile;
 
 // TODO?: move to error handling
-type JillParseError = Simple<char>;
+pub type JillParseError = Simple<char>;
 
 /// Parse a single module (source file).
 pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillParseError>> {

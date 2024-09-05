@@ -7,6 +7,7 @@ edition = "2021"
 chumsky = "0.9"
 strum = { version = "0.26", features = ["derive"] }
 heck = "0.5"
+ariadne = "0.4"
 
 
 [lints.clippy]
