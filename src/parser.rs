@@ -158,6 +158,7 @@ fn expression() -> impl Parser<char, JillExpression, Error = JillParseError> {
             .or(function_reference().map(JillExpression::FunctionReference))
             .or(identifier::variable().map(JillExpression::VariableName))
             .padded()
+            .padded_by(comments())
     })
 }
 
