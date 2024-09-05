@@ -91,6 +91,7 @@ pub enum JillLiteral {
     Integer(isize),
     String(String),
     Bool(bool),
+    List(Vec<JillExpression>),
 }
 
 #[derive(Debug, Clone)]

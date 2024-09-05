@@ -68,6 +68,7 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
                         .clone()
                         .separated_by(just(','))
                         .allow_trailing()
+                        .padded()
                         .delimited_by(just('('), just(')')),
                 )
                 .map(|(reference, arguments)| JillFunctionCall {
@@ -78,7 +79,7 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
         // since there is possible ambiguity here, order in which the
         // options are listed is important (most specific => least specific)
-        literal()
+        literal(expression.clone())
             .map(JillExpression::Literal)
             .or(function_call.map(JillExpression::FunctionCall))
             .or(function_reference.map(JillExpression::FunctionReference))
@@ -144,7 +145,9 @@ fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clo
     comment.padded().repeated().ignored()
 }
 
-fn literal() -> impl Parser<char, JillLiteral, Error = JillParseError> {
+fn literal(
+    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, JillLiteral, Error = JillParseError> {
     // integer
     let number =
         text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
@@ -168,7 +171,15 @@ fn literal() -> impl Parser<char, JillLiteral, Error = JillParseError> {
         .map(|b| b == "True")
         .map(JillLiteral::Bool);
 
-    integer.or(string).or(boolean)
+    // list
+    let list = expression
+        .separated_by(just(','))
+        .allow_trailing()
+        .padded()
+        .delimited_by(just('['), just(']'))
+        .map(JillLiteral::List);
+
+    integer.or(string).or(boolean).or(list)
 }
 
 fn variable(
