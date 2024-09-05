@@ -23,28 +23,12 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
 
 /// Construct the parser for a Jill program module (file).
 fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let identifier = text::ident().padded().map(JillIdentifier);
-
-    let expression = recursive(|expression| {
-        let variable_name = identifier;
-
-        // since there is possible ambiguity here, order in which the
-        // options are listed is important (most specific => least specific)
-        literal(expression.clone())
-            .map(JillExpression::Literal)
-            .or(function_call(identifier, expression, variable_name)
-                .map(JillExpression::FunctionCall))
-            .or(function_reference(identifier).map(JillExpression::FunctionReference))
-            .or(variable_name.map(JillExpression::VariableName))
-            .padded()
-    });
-
     let function = recursive(|function| {
         text::keyword("fn")
-            .ignore_then(identifier)
-            .then(identifier.repeated())
+            .ignore_then(identifier())
+            .then(identifier().repeated())
             .then_ignore(just('='))
-            .then(function_body(identifier, expression.clone(), function))
+            .then(function_body(function))
             .padded()
             .padded_by(comments())
             .map(|((name, arguments), body)| JillFunction {
@@ -54,14 +38,10 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             })
     });
 
-    let module = r#type(identifier)
+    let module = r#type()
         .then_ignore(just('.'))
         .repeated()
-        .then(
-            variable(identifier.clone(), expression.clone())
-                .then_ignore(just('.'))
-                .repeated(),
-        )
+        .then(variable().then_ignore(just('.')).repeated())
         .then(function.then_ignore(just('.')).repeated())
         .padded()
         .map(|((types, variables), functions)| JillModuleContent {
@@ -78,7 +58,13 @@ fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clo
     comment.padded().repeated().ignored()
 }
 
+fn identifier() -> impl Parser<char, JillIdentifier, Error = JillParseError> {
+    text::ident().padded().map(JillIdentifier)
+}
+
 fn nested_expression_list(
+    // NOTE: since this is a part of the (recursive) `expression` parser definition,
+    // we have to directly pass expression parser
     expression: impl Parser<char, JillExpression, Error = JillParseError>,
 ) -> impl Parser<char, Vec<JillExpression>, Error = JillParseError> {
     expression.separated_by(just(',')).allow_trailing().padded()
@@ -89,12 +75,11 @@ type JillFunctionReferenceComponents = (
     JillIdentifier,
 );
 fn fully_qualified_function_name(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
 ) -> impl Parser<char, JillFunctionReferenceComponents, Error = JillParseError> {
-    let modules_path = identifier.clone().then_ignore(just("::")).repeated();
+    let modules_path = identifier().then_ignore(just("::")).repeated();
 
-    let associated_type = identifier.clone().then_ignore(just(":"));
-    let function_name = identifier;
+    let associated_type = identifier().then_ignore(just(":"));
+    let function_name = identifier();
 
     modules_path
         .then(associated_type.or_not())
@@ -102,7 +87,9 @@ fn fully_qualified_function_name(
 }
 
 fn literal(
-    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
+    // NOTE: since this is a part of the (recursive) `expression` parser definition,
+    // we have to directly pass expression parser
+    expression: impl Parser<char, JillExpression, Error = JillParseError>,
 ) -> impl Parser<char, JillLiteral, Error = JillParseError> {
     // integer
     let number =
@@ -135,11 +122,9 @@ fn literal(
     integer.or(string).or(boolean).or(list)
 }
 
-fn function_reference(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
-) -> impl Parser<char, JillFunctionReference, Error = JillParseError> {
+fn function_reference() -> impl Parser<char, JillFunctionReference, Error = JillParseError> {
     just("&")
-        .ignore_then(fully_qualified_function_name(identifier))
+        .ignore_then(fully_qualified_function_name())
         .then_ignore(
             none_of("(")
                 .rewind()
@@ -155,12 +140,12 @@ fn function_reference(
 }
 
 fn function_call(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+    // NOTE: since this is a part of the (recursive) `expression` parser definition,
+    // we have to directly pass expression parser
     expression: impl Parser<char, JillExpression, Error = JillParseError>,
-    variable_name: impl Parser<char, JillIdentifier, Error = JillParseError>,
 ) -> impl Parser<char, JillFunctionCall, Error = JillParseError> {
-    let function_call_source = fully_qualified_function_name(identifier)
-        .or(variable_name.map(|name| ((vec![], None), name)))
+    let function_call_source = fully_qualified_function_name()
+        .or(identifier().map(|name| ((vec![], None), name)))
         .map(
             |((modules_path, associated_type), function_name)| JillFunctionReference {
                 modules_path,
@@ -177,21 +162,27 @@ fn function_call(
         })
 }
 
+fn expression() -> impl Parser<char, JillExpression, Error = JillParseError> {
+    recursive(|expression| {
+        // since there is possible ambiguity here, order in which the
+        // options are listed is important (most specific => least specific)
+        literal(expression.clone())
+            .map(JillExpression::Literal)
+            .or(function_call(expression).map(JillExpression::FunctionCall))
+            .or(function_reference().map(JillExpression::FunctionReference))
+            .or(identifier().map(JillExpression::VariableName))
+            .padded()
+    })
+}
+
 fn function_body(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
-    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
     nested_function: impl Parser<char, JillFunction, Error = JillParseError>,
 ) -> impl Parser<char, JillFunctionBody, Error = JillParseError> {
     nested_function
         .then_ignore(just('.'))
         .repeated()
-        .then(
-            variable(identifier, expression.clone())
-                .clone()
-                .then_ignore(just(','))
-                .repeated(),
-        )
-        .then(expression)
+        .then(variable().then_ignore(just(',')).repeated())
+        .then(expression())
         .padded()
         .map(
             |((local_functions, local_variables), return_expression)| JillFunctionBody {
@@ -202,27 +193,20 @@ fn function_body(
         )
 }
 
-fn variable(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
-    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
-) -> impl Parser<char, JillVariable, Error = JillParseError> + std::clone::Clone {
+fn variable() -> impl Parser<char, JillVariable, Error = JillParseError> {
     text::keyword("let")
-        .ignore_then(identifier)
+        .ignore_then(identifier())
         .then_ignore(just('='))
-        .then(expression)
+        .then(expression())
         .padded()
         .padded_by(comments())
         .map(|(name, value)| JillVariable { name, value })
 }
 
-fn r#type(
-    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
-) -> impl Parser<char, JillType, Error = JillParseError> {
-    let variant = identifier
-        .clone()
+fn r#type() -> impl Parser<char, JillType, Error = JillParseError> {
+    let variant = identifier()
         .then(
-            identifier
-                .clone()
+            identifier()
                 .separated_by(just(','))
                 .allow_trailing()
                 .delimited_by(just('('), just(')'))
@@ -234,7 +218,7 @@ fn r#type(
         });
 
     text::keyword("type")
-        .ignore_then(identifier)
+        .ignore_then(identifier())
         .then_ignore(just('='))
         .then(variant.separated_by(just(',')))
         .padded()
