@@ -28,19 +28,21 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     let expression = recursive(|expression| {
         let variable_name = identifier;
 
-        // ( :: | ( mod_name:: )+ )
-        let local_module_path = just("::").to(Vec::new());
-        let modules_path = identifier
-            .then_ignore(just("::"))
-            .repeated()
-            .at_least(1)
-            .or(local_module_path);
+        let modules_path = identifier.then_ignore(just("::")).repeated();
 
         let associated_type = identifier.then_ignore(just(":"));
         let function_name = identifier;
-        let function_reference = modules_path
+        let fully_qualified_function_name = modules_path
             .then(associated_type.or_not())
-            .then(function_name)
+            .then(function_name);
+
+        let function_reference = just("&")
+            .ignore_then(fully_qualified_function_name)
+            .then_ignore(
+                none_of("(")
+                    .rewind()
+                    .labelled("cannot reference and call a function"),
+            )
             .map(
                 |((modules_path, associated_type), function_name)| JillFunctionReference {
                     modules_path,
@@ -50,14 +52,15 @@ fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             );
 
         let function_call = {
-            let function_call_source =
-                function_reference
-                    .clone()
-                    .or(variable_name.map(|name| JillFunctionReference {
-                        modules_path: vec![],
-                        associated_type: None,
-                        function_name: name,
-                    }));
+            let function_call_source = fully_qualified_function_name
+                .or(variable_name.map(|name| ((vec![], None), name)))
+                .map(
+                    |((modules_path, associated_type), function_name)| JillFunctionReference {
+                        modules_path,
+                        associated_type,
+                        function_name,
+                    },
+                );
 
             function_call_source
                 .then(
