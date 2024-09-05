@@ -50,7 +50,7 @@ pub struct JillType {
 #[derive(Debug)]
 pub struct JillTypeVariant {
     pub name: JillIdentifier,
-    pub arguments: Vec<JillIdentifier>,
+    pub fields: Vec<JillIdentifier>,
 }
 
 #[derive(Debug)]
@@ -90,9 +90,16 @@ pub struct JillFunctionCall {
 pub enum JillLiteral {
     Integer(isize),
     String(String),
+    Bool(bool),
 }
 
 #[derive(Debug, Clone)]
 pub struct JillIdentifier(pub String);
+
+impl std::fmt::Display for JillIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 // endregion

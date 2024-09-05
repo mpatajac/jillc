@@ -25,12 +25,12 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
 #[allow(clippy::too_many_lines)]
 /// Construct the parser for a Jill program module (file).
 fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let positive_integer =
-        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid integer"));
+    let number =
+        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
 
     let negation_sign = just('-').or_not();
     let integer = negation_sign
-        .then(positive_integer)
+        .then(number)
         .map(|(sign, number)| if sign.is_some() { -number } else { number })
         .map(JillLiteral::Integer);
 
@@ -40,13 +40,18 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
         .map(|chars| chars.into_iter().collect())
         .map(JillLiteral::String);
 
+    let boolean = just("True")
+        .or(just("False"))
+        .map(|b| b == "True")
+        .map(JillLiteral::Bool);
+
     let identifier = text::ident().padded().map(JillIdentifier);
 
     let comment = just("--").then(take_until(text::newline()));
     let comments = comment.repeated().padded().ignored();
 
     let expression = recursive(|expression| {
-        let literal = integer.or(string).map(JillExpression::Literal);
+        let literal = integer.or(string).or(boolean).map(JillExpression::Literal);
 
         let variable_name = identifier;
 
@@ -149,9 +154,9 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
                 .delimited_by(just('('), just(')'))
                 .or_not(),
         )
-        .map(|(name, arguments)| JillTypeVariant {
+        .map(|(name, fields)| JillTypeVariant {
             name,
-            arguments: arguments.unwrap_or(Vec::new()),
+            fields: fields.unwrap_or(Vec::new()),
         });
 
     let r#type = text::keyword("type")
