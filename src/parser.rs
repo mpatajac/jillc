@@ -13,7 +13,7 @@ pub type JillParseError = Simple<char>;
 /// Parse a single module (source file).
 pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillParseError>> {
     let module_name = source_file.module_name();
-    let module_content = parser().parse(source_file.content())?;
+    let module_content = module().parse(source_file.content())?;
 
     Ok(JillModule {
         name: module_name,
@@ -21,38 +21,11 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
     })
 }
 
-// TODO: try to split into separate functions
-#[allow(clippy::too_many_lines)]
 /// Construct the parser for a Jill program module (file).
-fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let number =
-        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
-
-    let negation_sign = just('-').or_not();
-    let integer = negation_sign
-        .then(number)
-        .map(|(sign, number)| if sign.is_some() { -number } else { number })
-        .map(JillLiteral::Integer);
-
-    let string = just('"')
-        .ignore_then(none_of('"').repeated())
-        .then_ignore(just('"'))
-        .map(|chars| chars.into_iter().collect())
-        .map(JillLiteral::String);
-
-    let boolean = just("True")
-        .or(just("False"))
-        .map(|b| b == "True")
-        .map(JillLiteral::Bool);
-
+fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
     let identifier = text::ident().padded().map(JillIdentifier);
 
-    let comment = just("--").then(take_until(text::newline()));
-    let comments = comment.repeated().padded().ignored();
-
     let expression = recursive(|expression| {
-        let literal = integer.or(string).or(boolean).map(JillExpression::Literal);
-
         let variable_name = identifier;
 
         // ( :: | ( mod_name:: )+ )
@@ -102,27 +75,25 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
 
         // since there is possible ambiguity here, order in which the
         // options are listed is important (most specific => least specific)
-        literal
+        literal()
+            .map(JillExpression::Literal)
             .or(function_call.map(JillExpression::FunctionCall))
             .or(function_reference.map(JillExpression::FunctionReference))
             .or(variable_name.map(JillExpression::VariableName))
             .padded()
     });
 
-    let variable = text::keyword("let")
-        .ignore_then(identifier)
-        .then_ignore(just('='))
-        .then(expression.clone())
-        .padded()
-        .padded_by(comments)
-        .map(|(name, value)| JillVariable { name, value });
-
     let function = recursive(|function| {
         let function_body = function
             .then_ignore(just('.'))
             .repeated()
-            .then(variable.clone().then_ignore(just(',')).repeated())
-            .then(expression)
+            .then(
+                variable(identifier.clone(), expression.clone())
+                    .clone()
+                    .then_ignore(just(','))
+                    .repeated(),
+            )
+            .then(expression.clone())
             .padded()
             .map(
                 |((local_functions, local_variables), return_expression)| JillFunctionBody {
@@ -138,7 +109,7 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             .then_ignore(just('='))
             .then(function_body)
             .padded()
-            .padded_by(comments)
+            .padded_by(comments())
             .map(|((name, arguments), body)| JillFunction {
                 name,
                 arguments,
@@ -146,9 +117,78 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             })
     });
 
+    let module = r#type(identifier)
+        .then_ignore(just('.'))
+        .repeated()
+        .then(
+            variable(identifier.clone(), expression.clone())
+                .then_ignore(just('.'))
+                .repeated(),
+        )
+        .then(function.then_ignore(just('.')).repeated())
+        .padded()
+        .map(|((types, variables), functions)| JillModuleContent {
+            types,
+            variables,
+            functions,
+        });
+
+    module.then_ignore(end())
+}
+
+fn comments() -> impl Parser<char, (), Error = JillParseError> + std::clone::Clone {
+    let comment = just("--").then(take_until(text::newline()));
+    comment.repeated().padded().ignored()
+}
+
+fn literal() -> impl Parser<char, JillLiteral, Error = JillParseError> {
+    // integer
+    let number =
+        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
+
+    let negation_sign = just('-').or_not();
+    let integer = negation_sign
+        .then(number)
+        .map(|(sign, number)| if sign.is_some() { -number } else { number })
+        .map(JillLiteral::Integer);
+
+    // string
+    let string = just('"')
+        .ignore_then(none_of('"').repeated())
+        .then_ignore(just('"'))
+        .map(|chars| chars.into_iter().collect())
+        .map(JillLiteral::String);
+
+    // bool
+    let boolean = just("True")
+        .or(just("False"))
+        .map(|b| b == "True")
+        .map(JillLiteral::Bool);
+
+    integer.or(string).or(boolean)
+}
+
+fn variable(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+    expression: impl Parser<char, JillExpression, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, JillVariable, Error = JillParseError> + std::clone::Clone {
+    text::keyword("let")
+        .ignore_then(identifier)
+        .then_ignore(just('='))
+        .then(expression)
+        .padded()
+        .padded_by(comments())
+        .map(|(name, value)| JillVariable { name, value })
+}
+
+fn r#type(
+    identifier: impl Parser<char, JillIdentifier, Error = JillParseError> + std::clone::Clone,
+) -> impl Parser<char, JillType, Error = JillParseError> {
     let variant = identifier
+        .clone()
         .then(
             identifier
+                .clone()
                 .separated_by(just(','))
                 .allow_trailing()
                 .delimited_by(just('('), just(')'))
@@ -159,25 +199,11 @@ fn parser() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
             fields: fields.unwrap_or(Vec::new()),
         });
 
-    let r#type = text::keyword("type")
+    text::keyword("type")
         .ignore_then(identifier)
         .then_ignore(just('='))
         .then(variant.separated_by(just(',')))
         .padded()
-        .padded_by(comments)
-        .map(|(name, variants)| JillType { name, variants });
-
-    let module = r#type
-        .then_ignore(just('.'))
-        .repeated()
-        .then(variable.then_ignore(just('.')).repeated())
-        .then(function.then_ignore(just('.')).repeated())
-        .padded()
-        .map(|((types, variables), functions)| JillModuleContent {
-            types,
-            variables,
-            functions,
-        });
-
-    module.then_ignore(end())
+        .padded_by(comments())
+        .map(|(name, variants)| JillType { name, variants })
 }
