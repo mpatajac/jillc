@@ -23,26 +23,11 @@ pub fn parse_module(source_file: &SourceFile) -> Result<JillModule, Vec<JillPars
 
 /// Construct the parser for a Jill program module (file).
 fn module() -> impl Parser<char, JillModuleContent, Error = JillParseError> {
-    let function = recursive(|function| {
-        text::keyword("fn")
-            .ignore_then(identifier())
-            .then(identifier().repeated())
-            .then_ignore(just('='))
-            .then(function_body(function))
-            .padded()
-            .padded_by(comments())
-            .map(|((name, arguments), body)| JillFunction {
-                name,
-                arguments,
-                body,
-            })
-    });
-
     let module = r#type()
         .then_ignore(just('.'))
         .repeated()
         .then(variable().then_ignore(just('.')).repeated())
-        .then(function.then_ignore(just('.')).repeated())
+        .then(function().then_ignore(just('.')).repeated())
         .padded()
         .map(|((types, variables), functions)| JillModuleContent {
             types,
@@ -201,6 +186,23 @@ fn variable() -> impl Parser<char, JillVariable, Error = JillParseError> {
         .padded()
         .padded_by(comments())
         .map(|(name, value)| JillVariable { name, value })
+}
+
+fn function() -> impl Parser<char, JillFunction, Error = JillParseError> {
+    recursive(|function| {
+        text::keyword("fn")
+            .ignore_then(identifier())
+            .then(identifier().repeated())
+            .then_ignore(just('='))
+            .then(function_body(function))
+            .padded()
+            .padded_by(comments())
+            .map(|((name, arguments), body)| JillFunction {
+                name,
+                arguments,
+                body,
+            })
+    })
 }
 
 fn r#type() -> impl Parser<char, JillType, Error = JillParseError> {
