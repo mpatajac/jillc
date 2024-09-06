@@ -10,7 +10,7 @@ pub fn construct(
     literal: &ast::JillLiteral,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> vm::VMInstructionBlock {
+) -> Vec<vm::VMInstruction> {
     match literal {
         ast::JillLiteral::Integer(i) => construct_integer(i),
         ast::JillLiteral::String(s) => construct_string(s),
@@ -19,17 +19,17 @@ pub fn construct(
     }
 }
 
-fn construct_integer(i: &isize) -> vm::VMInstructionBlock {
+fn construct_integer(i: &isize) -> Vec<vm::VMInstruction> {
     let mut instructions = vec![vm::push(vm::Segment::Constant, i.unsigned_abs())];
 
     if *i < 0 {
         instructions.push(vm::command(vm::VMCommand::Neg));
     }
 
-    instructions.into()
+    instructions
 }
 
-fn construct_string(s: &str) -> vm::VMInstructionBlock {
+fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
     let string_init = vec![
         vm::push(vm::Segment::Constant, s.len()),
         vm::call("String.new", 1),
@@ -45,10 +45,10 @@ fn construct_string(s: &str) -> vm::VMInstructionBlock {
         })
         .collect();
 
-    [string_init, string_population].concat().into()
+    [string_init, string_population].concat()
 }
 
-fn construct_bool(b: &bool) -> vm::VMInstructionBlock {
+fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
     if *b {
         vec![
             vm::push(vm::Segment::Constant, 1),
@@ -57,7 +57,6 @@ fn construct_bool(b: &bool) -> vm::VMInstructionBlock {
     } else {
         vec![vm::push(vm::Segment::Constant, 0)]
     }
-    .into()
 }
 
 fn to_ascii(c: char) -> usize {
@@ -66,13 +65,18 @@ fn to_ascii(c: char) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use crate::codegen::vm;
+
     #[test]
     fn test_positive_integer_construction() {
         let i = 17;
 
         let expected = "push constant 17";
 
-        assert_eq!(super::construct_integer(&i).compile(), expected);
+        assert_eq!(
+            vm::VMInstructionBlock::from(super::construct_integer(&i)).compile(),
+            expected
+        );
     }
 
     #[test]
@@ -81,7 +85,10 @@ mod tests {
 
         let expected = ["push constant 28", "neg"].join("\n");
 
-        assert_eq!(super::construct_integer(&i).compile(), expected);
+        assert_eq!(
+            vm::VMInstructionBlock::from(super::construct_integer(&i)).compile(),
+            expected
+        );
     }
 
     #[test]
@@ -100,6 +107,9 @@ mod tests {
         ]
         .join("\n");
 
-        assert_eq!(super::construct_string(&s).compile(), expected);
+        assert_eq!(
+            vm::VMInstructionBlock::from(super::construct_string(&s)).compile(),
+            expected
+        );
     }
 }
