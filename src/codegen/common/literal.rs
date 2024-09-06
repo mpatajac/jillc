@@ -15,6 +15,7 @@ pub fn construct(
         ast::JillLiteral::Integer(i) => construct_integer(i),
         ast::JillLiteral::String(s) => construct_string(s),
         ast::JillLiteral::Bool(b) => construct_bool(b),
+        ast::JillLiteral::List(l) => todo!(),
     }
 }
 

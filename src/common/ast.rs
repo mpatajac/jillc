@@ -38,6 +38,7 @@ pub struct JillVariable {
 pub struct JillFunction {
     pub name: JillIdentifier,
     pub arguments: Vec<JillIdentifier>,
+    pub captures: Vec<JillIdentifier>,
     pub body: JillFunctionBody,
 }
 
@@ -91,6 +92,7 @@ pub enum JillLiteral {
     Integer(isize),
     String(String),
     Bool(bool),
+    List(Vec<JillExpression>),
 }
 
 #[derive(Debug, Clone)]
