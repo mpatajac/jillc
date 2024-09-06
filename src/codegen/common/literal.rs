@@ -15,7 +15,7 @@ pub fn construct(
         ast::JillLiteral::Integer(i) => construct_integer(i),
         ast::JillLiteral::String(s) => construct_string(s),
         ast::JillLiteral::Bool(b) => construct_bool(b),
-        ast::JillLiteral::List(l) => todo!(),
+        ast::JillLiteral::List(l) => construct_list(l, module_context, program_context),
     }
 }
 
@@ -57,6 +57,43 @@ fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
     } else {
         vec![vm::push(vm::Segment::Constant, 0)]
     }
+}
+
+fn construct_list(
+    l: &Vec<ast::JillExpression>,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) -> Vec<vm::VMInstruction> {
+    // start with an empty list
+    let empty_list = vec![vm::call("List.Empty", 0)];
+
+    if l.is_empty() {
+        // no elements, just return the empty list
+        return empty_list;
+    };
+
+    let instructions = l
+        .iter()
+        // need to add elements in reverse order
+        .rev()
+        .flat_map(|elem| {
+            [
+                // move last result to temporary storage
+                vec![vm::pop(vm::Segment::Temp, 0)],
+                // evaluate next elem
+                super::expression::construct(elem, module_context, program_context),
+                vec![
+                    // re-push previous result (to maintain proper element order)
+                    vm::push(vm::Segment::Temp, 0),
+                    // construct new list "head"
+                    vm::call("List.List", 2),
+                ],
+            ]
+            .concat()
+        })
+        .collect();
+
+    [empty_list, instructions].concat()
 }
 
 fn to_ascii(c: char) -> usize {
@@ -111,5 +148,10 @@ mod tests {
             vm::VMInstructionBlock::from(super::construct_string(&s)).compile(),
             expected
         );
+    }
+
+    #[test]
+    fn test_list_construction() {
+        // TODO!: when expression is implemented
     }
 }
