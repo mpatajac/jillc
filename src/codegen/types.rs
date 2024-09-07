@@ -1,62 +1,77 @@
 use crate::common::ast;
 
-use super::context::{self, ModuleContext, ProgramContext};
+use super::{
+    context::{self, ModuleContext, ProgramContext},
+    error::FallableAction,
+};
 
 pub fn construct(
     types: Vec<ast::JillType>,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) {
+) -> FallableAction {
     for jill_type in types {
         // reset stored type info
         module_context.type_info = context::module::TypeInfo::new();
 
-        construct_type(jill_type, module_context, program_context);
+        construct_type(&jill_type, module_context, program_context)?;
     }
+
+    Ok(())
 }
 
 fn construct_type(
-    jill_type: ast::JillType,
+    jill_type: &ast::JillType,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) {
+) -> FallableAction {
     module_context.type_info.current_variant = 0;
 
-    for variant in jill_type.variants {
-        variant::construct(variant, module_context, program_context);
+    for variant in &jill_type.variants {
+        variant::construct(variant, module_context, program_context)?;
 
         module_context.type_info.current_variant += 1;
     }
+
+    Ok(())
 }
 
 mod variant {
-    use crate::codegen::vm::{self, Segment};
+    use crate::codegen::{
+        context::module::FunctionContextArguments,
+        error::FallableAction,
+        vm::{self, Segment},
+    };
 
     use super::{ast, ModuleContext, ProgramContext};
 
     use heck::ToTitleCase;
 
     pub(super) fn construct(
-        variant: ast::JillTypeVariant,
+        variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
-        construct_ctor(&variant, module_context, program_context);
+    ) -> FallableAction {
+        construct_ctor(variant, module_context, program_context)?;
 
         // TODO?: only generate if requested (`with get|update|eq|...`)
-        construct_accessors(&variant, module_context, program_context);
-        construct_updaters(&variant, module_context, program_context);
+        construct_accessors(variant, module_context, program_context)?;
+        construct_updaters(variant, module_context, program_context)?;
+
+        Ok(())
     }
 
     fn construct_ctor(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         let number_of_fields = number_of_fields(variant);
 
         let variant_tag = module_context.type_info.current_variant;
         let function_name = ctor_name(variant, module_context);
+
+        add_function_to_scope(variant, function_name.clone(), module_context)?;
 
         let tag_index = tag_index(variant);
 
@@ -85,16 +100,20 @@ mod variant {
         .concat();
 
         module_context.output.add_block(output_block.into());
+
+        Ok(())
     }
 
     fn construct_accessors(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
             let function_name =
                 format!("{}.{}_{}", module_context.module_name, variant.name, field);
+
+            add_function_to_scope(variant, function_name.clone(), module_context)?;
 
             let output_block = vec![
                 vm::function(function_name, 0),
@@ -106,13 +125,15 @@ mod variant {
 
             module_context.output.add_block(output_block.into());
         }
+
+        Ok(())
     }
 
     fn construct_updaters(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         let ctor_name = ctor_name(variant, module_context);
         let ctor_argument_count = variant.fields.len();
 
@@ -123,6 +144,8 @@ mod variant {
                 variant.name,
                 field.0.to_title_case()
             );
+
+            add_function_to_scope(variant, function_name.clone(), module_context)?;
 
             let ctor_arg_mapping = |i| {
                 if i == variant_index {
@@ -151,15 +174,39 @@ mod variant {
 
             module_context.output.add_block(output_block.into());
         }
+
+        Ok(())
+    }
+
+    /// Type-related functions have no nested functions,
+    /// so we can instantly close their frame.
+    fn add_function_to_scope(
+        variant: &ast::JillTypeVariant,
+        function_name: String,
+        module_context: &mut ModuleContext,
+    ) -> FallableAction {
+        module_context.scope.enter_function(
+            function_name,
+            FunctionContextArguments {
+                number_of_arguments: number_of_arguments(variant),
+            },
+        )?;
+        module_context.scope.leave_function();
+
+        Ok(())
     }
 
     fn ctor_name(variant: &ast::JillTypeVariant, module_context: &ModuleContext) -> String {
         format!("{}.{}", module_context.module_name, variant.name)
     }
 
+    fn number_of_arguments(variant: &ast::JillTypeVariant) -> usize {
+        variant.fields.len()
+    }
+
     fn number_of_fields(variant: &ast::JillTypeVariant) -> usize {
         // listed fields + tag
-        variant.fields.len() + 1
+        number_of_arguments(variant) + 1
     }
 
     fn tag_index(variant: &ast::JillTypeVariant) -> usize {
@@ -246,9 +293,16 @@ mod tests {
             .concat()
             .join("\n");
 
-        construct(types, &mut module_context, &mut program_context);
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
 
+        // compiled instructions match expected ones
         assert_eq!(module_context.output.compile(), expected);
+
+        // function added to scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Bar.Bar_updateFoo1"))
+            .is_some());
     }
 
     #[test]
@@ -317,8 +371,20 @@ mod tests {
             .concat()
             .join("\n");
 
-        construct(types, &mut module_context, &mut program_context);
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
 
+        // compiled instructions match expected ones
         assert_eq!(module_context.output.compile(), expected);
+
+        // function added to scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Option.None"))
+            .is_some());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Option.Some_updateValue"))
+            .is_some());
     }
 }

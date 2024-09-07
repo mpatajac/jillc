@@ -12,13 +12,16 @@ mod jillstd;
 mod types;
 mod vm;
 
-pub fn construct_module(module: ast::JillModule, program_context: &mut ProgramContext) -> String {
+pub fn construct_module(
+    module: ast::JillModule,
+    program_context: &mut ProgramContext,
+) -> Result<String, error::Error> {
     let mut module_context = ModuleContext::new(module.name);
 
-    types::construct(module.content.types, &mut module_context, program_context);
+    types::construct(module.content.types, &mut module_context, program_context)?;
 
     // TODO: lets (globals)
     // TODO: fns
 
-    module_context.output.compile()
+    Ok(module_context.output.compile())
 }
