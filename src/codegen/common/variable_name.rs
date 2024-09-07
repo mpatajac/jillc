@@ -11,23 +11,21 @@ pub fn construct(
     variable: &ast::JillIdentifier,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<vm::VMInstructionBlock, Error> {
+) -> Result<Vec<vm::VMInstruction>, Error> {
     let variable_name = &variable.0;
 
     let Some(variable_context) = module_context.scope.search_variable(variable_name) else {
         return Err(Error::VariableNotInScope(variable_name.clone()));
     };
 
-    let instructions = vec![vm::push(variable_context.segment, variable_context.index)].into();
+    let instructions = vec![vm::push(variable_context.segment, variable_context.index)];
 
     Ok(instructions)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::context::module::{
-        FunctionContext, FunctionContextArguments, VariableContext,
-    };
+    use crate::codegen::context::module::{FunctionContextArguments, VariableContext};
 
     use super::*;
 
@@ -64,7 +62,10 @@ mod tests {
             &mut module_context,
             &mut program_context
         )
-        .is_ok_and(|instructions| instructions.compile() == expected_instructions));
+        .is_ok_and(
+            |instructions| vm::VMInstructionBlock::from(instructions).compile()
+                == expected_instructions
+        ));
     }
 
     #[test]
