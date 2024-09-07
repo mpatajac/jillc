@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::codegen::jillstd::JillStdUsageTracker;
+
 // region: Context
 
 /// Context information regarding the entire program, across modules
@@ -8,12 +10,14 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Context {
     pub function_dispatch: FunctionDispatch,
+    pub std_usage_tracker: JillStdUsageTracker,
 }
 
 impl Context {
     pub fn new() -> Self {
         Self {
             function_dispatch: FunctionDispatch::new(),
+            std_usage_tracker: JillStdUsageTracker::new(),
         }
     }
 }

@@ -3,7 +3,7 @@ use crate::{
         common::helpers::function::JillFunctionReferenceExtensions,
         context::{module::FunctionContext, ModuleContext, ProgramContext},
         error::Error,
-        vm,
+        jillstd, vm,
     },
     common::ast,
 };
@@ -18,12 +18,18 @@ pub fn construct(
         .search_function(&function_reference.function_name.0);
 
     if !is_valid_function_reference(function_reference, &function_context) {
-        return Err(Error::InvalidFunctionReference(
-            function_reference.reconstruct_source_name(),
-        ));
+        return invalid_function_reference(function_reference);
     }
 
-    // TODO!: track `std` function occurences
+    // track (potential) `JillStd` function occurences
+    let std_function_usage_note_outcome = program_context
+        .std_usage_tracker
+        .note_usage(function_reference);
+    if std_function_usage_note_outcome
+        == jillstd::JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule
+    {
+        return invalid_function_reference(function_reference);
+    }
 
     let function_prefix = function_context.map(|ctx| ctx.prefix).unwrap_or_default();
     let fully_qualified_function_reference_name = function_reference
@@ -47,6 +53,14 @@ fn is_valid_function_reference(
     function_context: &Option<FunctionContext>,
 ) -> bool {
     function_reference.is_fully_qualified() || function_context.is_some()
+}
+
+fn invalid_function_reference(
+    function_reference: &ast::JillFunctionReference,
+) -> Result<Vec<vm::VMInstruction>, Error> {
+    Err(Error::InvalidFunctionReference(
+        function_reference.reconstruct_source_name(),
+    ))
 }
 
 #[cfg(test)]
