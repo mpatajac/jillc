@@ -3,6 +3,7 @@ use crate::common::ast;
 use super::{
     context::{self, ModuleContext, ProgramContext},
     error::FallableAction,
+    vm::{self, Segment},
 };
 
 pub fn construct(
@@ -27,6 +28,8 @@ fn construct_type(
 ) -> FallableAction {
     module_context.type_info.current_variant = 0;
 
+    construct_tag(jill_type, module_context, program_context);
+
     for variant in &jill_type.variants {
         variant::construct(variant, module_context, program_context)?;
 
@@ -34,6 +37,28 @@ fn construct_type(
     }
 
     Ok(())
+}
+
+fn construct_tag(
+    jill_type: &ast::JillType,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) {
+    let function_name = format!("{}.tag", module_context.module_name);
+
+    // NOTE: this function is meant for internal usage,
+    // so we DO NOT add it to module scope.
+
+    let output_block = vec![
+        vm::function(function_name, 0),
+        vm::push(Segment::Argument, 0),
+        vm::pop(Segment::Pointer, 0),
+        // `tag` is always at `this 0`
+        vm::push(Segment::This, 0),
+        vm::vm_return(),
+    ];
+
+    module_context.output.add_block(output_block.into());
 }
 
 mod variant {
@@ -73,10 +98,13 @@ mod variant {
 
         add_function_to_scope(variant, function_name.clone(), module_context)?;
 
-        let tag_index = tag_index(variant);
-
-        let field_assignment =
-            |i: usize| vec![vm::push(Segment::Argument, i), vm::pop(Segment::This, i)];
+        let field_assignment = |i: usize| {
+            vec![
+                vm::push(Segment::Argument, i),
+                // offset by one because `tag` is at `this 0`
+                vm::pop(Segment::This, i + 1),
+            ]
+        };
 
         let assignments = (0..variant.fields.len())
             .flat_map(field_assignment)
@@ -92,7 +120,7 @@ mod variant {
             assignments,
             vec![
                 vm::push(Segment::Constant, variant_tag),
-                vm::pop(Segment::This, tag_index),
+                vm::pop(Segment::This, 0),
                 vm::push(Segment::Pointer, 0),
                 vm::vm_return(),
             ],
@@ -119,7 +147,8 @@ mod variant {
                 vm::function(function_name, 0),
                 vm::push(Segment::Argument, 0),
                 vm::pop(Segment::Pointer, 0),
-                vm::push(Segment::This, i),
+                // offset by one because `tag` is at `this 0`
+                vm::push(Segment::This, i + 1),
                 vm::vm_return(),
             ];
 
@@ -153,7 +182,8 @@ mod variant {
                     vm::push(Segment::Argument, 1)
                 } else {
                     // other fields => push existing field value
-                    vm::push(Segment::This, i)
+                    // offset by one because `tag` is at `this 0`
+                    vm::push(Segment::This, i + 1)
                 }
             };
 
@@ -208,11 +238,6 @@ mod variant {
         // listed fields + tag
         number_of_arguments(variant) + 1
     }
-
-    fn tag_index(variant: &ast::JillTypeVariant) -> usize {
-        // last item
-        number_of_fields(variant) - 1
-    }
 }
 
 #[cfg(test)]
@@ -238,17 +263,25 @@ mod tests {
             }],
         }];
 
+        let tag = vec![
+            "function Bar.tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
         let ctor = vec![
             "function Bar.Bar 0",
             "push constant 3",
             "call Memory.alloc 1",
             "pop pointer 0",
             "push argument 0",
-            "pop this 0",
-            "push argument 1",
             "pop this 1",
-            "push constant 0",
+            "push argument 1",
             "pop this 2",
+            "push constant 0",
+            "pop this 0",
             "push pointer 0",
             "return",
         ];
@@ -257,7 +290,7 @@ mod tests {
             "function Bar.Bar_foo1 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "return",
         ];
 
@@ -265,7 +298,7 @@ mod tests {
             "function Bar.Bar_foo2 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 1",
+            "push this 2",
             "return",
         ];
 
@@ -274,7 +307,7 @@ mod tests {
             "push argument 0",
             "pop pointer 0",
             "push argument 1",
-            "push this 1",
+            "push this 2",
             "call Bar.Bar 2",
             "return",
         ];
@@ -283,13 +316,13 @@ mod tests {
             "function Bar.Bar_updateFoo2 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "push argument 1",
             "call Bar.Bar 2",
             "return",
         ];
 
-        let expected = [ctor, get_foo1, get_foo2, update_foo1, update_foo2]
+        let expected = [tag, ctor, get_foo1, get_foo2, update_foo1, update_foo2]
             .concat()
             .join("\n");
 
@@ -303,6 +336,12 @@ mod tests {
             .scope
             .search_function(&String::from("Bar.Bar_updateFoo1"))
             .is_some());
+
+        // `tag` function NOT in scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Bar.tag"))
+            .is_none());
     }
 
     #[test]
@@ -326,6 +365,14 @@ mod tests {
             ],
         }];
 
+        let tag = vec![
+            "function Option.tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
         let none_ctor = vec![
             "function Option.None 0",
             "push constant 1",
@@ -343,9 +390,9 @@ mod tests {
             "call Memory.alloc 1",
             "pop pointer 0",
             "push argument 0",
-            "pop this 0",
-            "push constant 1",
             "pop this 1",
+            "push constant 1",
+            "pop this 0",
             "push pointer 0",
             "return",
         ];
@@ -354,7 +401,7 @@ mod tests {
             "function Option.Some_value 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "return",
         ];
 
@@ -367,7 +414,7 @@ mod tests {
             "return",
         ];
 
-        let expected = [none_ctor, some_ctor, some_get_value, some_update_value]
+        let expected = [tag, none_ctor, some_ctor, some_get_value, some_update_value]
             .concat()
             .join("\n");
 
@@ -386,5 +433,11 @@ mod tests {
             .scope
             .search_function(&String::from("Option.Some_updateValue"))
             .is_some());
+
+        // `tag` function NOT in scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Bar.tag"))
+            .is_none());
     }
 }
