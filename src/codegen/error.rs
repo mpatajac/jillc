@@ -4,7 +4,7 @@ pub enum Error {
     VariableAlreadyInScope(String),
     FunctionAlreadyInScope(String),
     VariableNotInScope(String),
-    FunctionNotInScope(String),
+    InvalidFunctionReference(String),
 }
 
 pub type FallableAction = Result<(), Error>;

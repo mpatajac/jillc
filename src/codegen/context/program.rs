@@ -42,7 +42,7 @@ impl FunctionDispatch {
 
     /// Handle function reference encounter by either
     /// adding it to existing references (if not already present)
-    /// or increasing it's count.
+    /// or increasing its count.
     pub fn encounter(&mut self, name: FunctionReferenceName) -> FunctionReferenceIndex {
         let num_of_items = self.references.len();
 
