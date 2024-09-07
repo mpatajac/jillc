@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::codegen::{
-    self,
     error::{Error, FallableAction},
     vm,
 };
@@ -55,8 +54,8 @@ pub struct Scope {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScopeSearchOutcome {
     NotFound,
-    Variable(VariableContext),
-    Function(FunctionContext),
+    Variable,
+    Function,
 }
 
 type Name = String;
@@ -65,71 +64,139 @@ impl Scope {
     pub fn new() -> Self {
         Self {
             // initialize with the module-level scope
-            frames: vec![ScopeFrame::new()],
+            frames: vec![ScopeFrame::new(String::new())],
         }
     }
 
-    /// Add a new frame to scope.
-    /// This is usually performed when entering a new function definition.
-    pub fn add_frame(&mut self) {
-        self.frames.push(ScopeFrame::new());
+    /// Add a function to the (latest frame of the) scope
+    /// and add new frame for this function.
+    ///
+    /// This is usually performed during a function definition.
+    pub fn enter_function(
+        &mut self,
+        name: Name,
+        context_arguments: FunctionContextArguments,
+    ) -> FallableAction {
+        // check for existing functions/variables with the same name (to prevent shadowing)
+        match self.search(&name) {
+            ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
+            ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
+            ScopeSearchOutcome::NotFound => {
+                let context = FunctionContext {
+                    number_of_arguments: context_arguments.number_of_arguments,
+                    prefix: self.construct_function_prefix(),
+                };
+
+                // add to list of existing functions
+                self.last_mut_frame()
+                    .functions
+                    .insert(name.clone(), context);
+
+                // create a frame for the new function
+                self.frames.push(ScopeFrame::new(name));
+
+                Ok(())
+            }
+        }
     }
 
-    /// Drop the last frame from the scope.
+    /// Denote that a function definition is ending and that
+    /// it should not contain further declarations.
+    ///
     /// This is usually performed when leaving a function definition.
-    pub fn drop_frame(&mut self) {
+    pub fn leave_function(&mut self) {
         self.frames.pop();
     }
 
-    /// Add a new function to the (latest frame of the) scope.
-    /// This is usually performed after a function definition.
-    pub fn add_function(&mut self, name: Name, context: FunctionContext) -> FallableAction {
-        // check for existing functions/variables with the same name (to prevent shadowing)
-        match self.search(&name) {
-            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
-            ScopeSearchOutcome::NotFound => {
-                self.last_frame().functions.insert(name, context);
-                Ok(())
-            }
-        }
-    }
-
     /// Add a new variable to the (latest frame of the) scope.
-    /// This is usually performed after a variable definition.
+    ///
+    /// This is usually performed during a variable definition.
     pub fn add_variable(&mut self, name: Name, context: VariableContext) -> FallableAction {
         // check for existing functions/variables with the same name (to prevent shadowing)
         match self.search(&name) {
-            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
+            ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
+            ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
             ScopeSearchOutcome::NotFound => {
-                self.last_frame().variables.insert(name, context);
+                self.last_mut_frame().variables.insert(name, context);
                 Ok(())
             }
         }
     }
 
+    /// Search through the scope frames for a function with
+    /// a given identifier, returning its context upon a successful search.
+    pub fn search_function(&self, identifier: &Name) -> Option<FunctionContext> {
+        self.frames
+            .iter()
+            .rev()
+            .find_map(|frame| frame.functions.get(identifier))
+            .cloned()
+    }
+
+    /// Search through the scope frames for an accessible (global or very local) variable
+    /// with a given identifier, returning its context upon a successful search.
+    pub fn search_variable(&self, identifier: &Name) -> Option<VariableContext> {
+        // first check last (current) frame
+        self.last_frame()
+            .variables
+            .get(identifier)
+            .or_else(
+                // if not, check globals in the first (module) frame
+                || self.first_frame().variables.get(identifier),
+            )
+            .cloned()
+    }
+
+    /// Constructs a prefix from previously defined functions
+    /// in which (a potential) current function is nested.
+    ///
+    /// E.g. function `bar` defined inside the function `foo`
+    /// would have a prefix of `foo_` and full name of `foo_bar`.
+    fn construct_function_prefix(&self) -> String {
+        self.frames
+            .iter()
+            // skip first (module-level) frame, as it does not
+            // have an owner, an therefore a valid prefix
+            .skip(1)
+            .map(|frame| frame.owner.clone() + "_")
+            .collect()
+    }
+
+    /// Returns the first (module-level) scope frame.
+    fn first_frame(&self) -> &ScopeFrame {
+        self.frames
+            .first()
+            .expect("scope shoule at least have the module-level frame")
+    }
+
     /// Returns the last (latest, currently active) scope frame.
-    fn last_frame(&mut self) -> &mut ScopeFrame {
+    fn last_frame(&self) -> &ScopeFrame {
+        self.frames
+            .last()
+            .expect("scope shoule at least have the module-level frame")
+    }
+    /// Returns the mutable last (latest, currently active) scope frame.
+    fn last_mut_frame(&mut self) -> &mut ScopeFrame {
         self.frames
             .last_mut()
             .expect("scope shoule at least have the module-level frame")
     }
 
-    /// Search through the scope frames for a (local) variable
+    /// Search through the scope frames for a variable
     /// or a function with a given identifier,
     /// returning its context upon a successful search.
-    // TODO?: split into separate functions (for vars/funcs)
-    pub fn search(&self, identifier: &Name) -> ScopeSearchOutcome {
+    ///
+    /// Used internally to prevent name shadowing.
+    fn search(&self, identifier: &Name) -> ScopeSearchOutcome {
         // search from latest (last) to oldest (first)
         for frame in self.frames.iter().rev() {
             // variables have priority
-            if let Some(variable) = frame.variables.get(identifier) {
-                return ScopeSearchOutcome::Variable(variable.clone());
+            if frame.variables.contains_key(identifier) {
+                return ScopeSearchOutcome::Variable;
             }
 
-            if let Some(function) = frame.functions.get(identifier) {
-                return ScopeSearchOutcome::Function(function.clone());
+            if frame.functions.contains_key(identifier) {
+                return ScopeSearchOutcome::Function;
             }
         }
 
@@ -139,13 +206,15 @@ impl Scope {
 
 #[derive(Debug)]
 pub struct ScopeFrame {
+    owner: Name,
     functions: HashMap<Name, FunctionContext>,
     variables: HashMap<Name, VariableContext>,
 }
 
 impl ScopeFrame {
-    fn new() -> Self {
+    fn new(owner: Name) -> Self {
         Self {
+            owner,
             functions: HashMap::new(),
             variables: HashMap::new(),
         }
@@ -153,8 +222,14 @@ impl ScopeFrame {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionContextArguments {
+    pub number_of_arguments: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContext {
     pub number_of_arguments: usize,
+    pub prefix: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -175,6 +250,9 @@ mod tests {
     fn test_scope() {
         let mut scope = super::Scope::new();
 
+        assert_eq!(scope.construct_function_prefix(), String::new());
+
+        // let foo = _.
         assert!(scope
             .add_variable(
                 "foo".to_string(),
@@ -185,17 +263,15 @@ mod tests {
             )
             .is_ok());
 
+        // fn f a b = _.
         assert!(scope
-            .add_function(
+            .enter_function(
                 "f".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 2
+                super::FunctionContextArguments {
+                    number_of_arguments: 2,
                 },
             )
             .is_ok());
-
-        // fn f a b = _.
-        scope.add_frame();
 
         assert!(scope
             .add_variable(
@@ -217,19 +293,19 @@ mod tests {
             )
             .is_ok());
 
-        scope.drop_frame();
+        assert_eq!(scope.construct_function_prefix(), String::from("f_"));
 
+        scope.leave_function();
+
+        // fn g x = ...
         assert!(scope
-            .add_function(
+            .enter_function(
                 "g".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 1
+                super::FunctionContextArguments {
+                    number_of_arguments: 1,
                 },
             )
             .is_ok());
-
-        // fn g x = ...
-        scope.add_frame();
 
         assert!(scope
             .add_variable(
@@ -242,17 +318,15 @@ mod tests {
             .is_ok());
 
         // nested function
+        // fn baz a = _.
         assert!(scope
-            .add_function(
+            .enter_function(
                 "baz".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 1
+                super::FunctionContextArguments {
+                    number_of_arguments: 1,
                 },
             )
             .is_ok());
-
-        // fn baz a = _.
-        scope.add_frame();
 
         // `a` already existed, but it was defined in previous function,
         // so by now it should have gone out of scope
@@ -266,7 +340,9 @@ mod tests {
             )
             .is_ok());
 
-        scope.drop_frame();
+        assert_eq!(scope.construct_function_prefix(), String::from("g_baz_"));
+
+        scope.leave_function();
 
         // variable local to the `fn g` scope
         assert!(scope
@@ -280,27 +356,22 @@ mod tests {
             .is_ok());
 
         assert!(matches!(
-            scope.search(&"f".to_string()),
-            super::ScopeSearchOutcome::Function(super::FunctionContext {
-                number_of_arguments
+            scope.search_function(&"f".to_string()),
+            Some(super::FunctionContext {
+                number_of_arguments,
+                prefix
             })
         ));
 
         assert!(matches!(
-            scope.search(&"bar".to_string()),
-            super::ScopeSearchOutcome::Variable(super::VariableContext { segment, index })
+            scope.search_variable(&"bar".to_string()),
+            Some(super::VariableContext { segment, index })
         ));
 
-        assert!(matches!(
-            scope.search(&"jill".to_string()),
-            super::ScopeSearchOutcome::NotFound
-        ));
+        assert!(scope.search_function(&"jill".to_string()).is_none());
 
         // occured twice, but went out of scope both times
-        assert!(matches!(
-            scope.search(&"a".to_string()),
-            super::ScopeSearchOutcome::NotFound
-        ));
+        assert!(scope.search_variable(&"a".to_string()).is_none());
 
         // variable with a same name already exists (global)
         assert!(scope

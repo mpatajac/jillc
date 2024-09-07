@@ -1,6 +1,6 @@
 use crate::{
     codegen::{
-        context::{module::ScopeSearchOutcome, ModuleContext, ProgramContext},
+        context::{ModuleContext, ProgramContext},
         error::Error,
         vm,
     },
@@ -14,8 +14,7 @@ pub fn construct(
 ) -> Result<vm::VMInstructionBlock, Error> {
     let variable_name = &variable.0;
 
-    let ScopeSearchOutcome::Variable(variable_context) = module_context.scope.search(variable_name)
-    else {
+    let Some(variable_context) = module_context.scope.search_variable(variable_name) else {
         return Err(Error::VariableNotInScope(variable_name.clone()));
     };
 
@@ -26,7 +25,9 @@ pub fn construct(
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::context::module::{FunctionContext, VariableContext};
+    use crate::codegen::context::module::{
+        FunctionContext, FunctionContextArguments, VariableContext,
+    };
 
     use super::*;
 
@@ -37,15 +38,13 @@ mod tests {
 
         assert!(module_context
             .scope
-            .add_function(
+            .enter_function(
                 "foo".to_string(),
-                FunctionContext {
+                FunctionContextArguments {
                     number_of_arguments: 1,
                 },
             )
             .is_ok());
-
-        module_context.scope.add_frame();
 
         assert!(module_context
             .scope
