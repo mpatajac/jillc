@@ -83,7 +83,7 @@ impl Scope {
             ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
             ScopeSearchOutcome::NotFound => {
                 let context = FunctionContext {
-                    number_of_arguments: context_arguments.number_of_arguments,
+                    arity: context_arguments.number_of_arguments,
                     prefix: self.construct_function_prefix(),
                 };
 
@@ -228,7 +228,7 @@ pub struct FunctionContextArguments {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContext {
-    pub number_of_arguments: usize,
+    pub arity: usize,
     pub prefix: String,
 }
 
@@ -357,10 +357,7 @@ mod tests {
 
         assert!(matches!(
             scope.search_function(&"f".to_string()),
-            Some(super::FunctionContext {
-                number_of_arguments,
-                prefix
-            })
+            Some(super::FunctionContext { arity, prefix })
         ));
 
         assert!(matches!(
