@@ -27,3 +27,24 @@ pub fn construct(
         ast::JillExpression::FunctionCall(_) => todo!(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expression_construction() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        let expression = ast::JillExpression::Literal(ast::JillLiteral::Integer(5));
+
+        let expected = "push constant 5";
+
+        assert!(
+            construct(&expression, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+}
