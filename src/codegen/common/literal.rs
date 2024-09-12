@@ -1,6 +1,7 @@
 use crate::{
     codegen::{
         context::{ModuleContext, ProgramContext},
+        error::Error,
         vm,
     },
     common::ast,
@@ -10,13 +11,15 @@ pub fn construct(
     literal: &ast::JillLiteral,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Vec<vm::VMInstruction> {
-    match literal {
+) -> Result<Vec<vm::VMInstruction>, Error> {
+    let instructions = match literal {
         ast::JillLiteral::Integer(i) => construct_integer(i),
         ast::JillLiteral::String(s) => construct_string(s),
         ast::JillLiteral::Bool(b) => construct_bool(b),
-        ast::JillLiteral::List(l) => construct_list(l, module_context, program_context),
-    }
+        ast::JillLiteral::List(l) => construct_list(l, module_context, program_context)?,
+    };
+
+    Ok(instructions)
 }
 
 fn construct_integer(i: &isize) -> Vec<vm::VMInstruction> {
@@ -60,28 +63,28 @@ fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
 }
 
 fn construct_list(
-    l: &Vec<ast::JillExpression>,
+    list: &Vec<ast::JillExpression>,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Vec<vm::VMInstruction> {
+) -> Result<Vec<vm::VMInstruction>, Error> {
     // start with an empty list
     let empty_list = vec![vm::call(vm::VMFunctionName::from_literal("List.Empty"), 0)];
 
-    if l.is_empty() {
+    if list.is_empty() {
         // no elements, just return the empty list
-        return empty_list;
+        return Ok(empty_list);
     };
 
-    let instructions = l
+    let instructions = list
         .iter()
         // need to add elements in reverse order
         .rev()
-        .flat_map(|elem| {
-            [
+        .map(|elem| {
+            Ok([
                 // move last result to temporary storage
                 vec![vm::pop(vm::Segment::Temp, 0)],
                 // evaluate next elem
-                super::expression::construct(elem, module_context, program_context),
+                super::expression::construct(elem, module_context, program_context)?,
                 vec![
                     // re-push previous result (to maintain proper element order)
                     vm::push(vm::Segment::Temp, 0),
@@ -89,11 +92,12 @@ fn construct_list(
                     vm::call(vm::VMFunctionName::from_literal("List.List"), 2),
                 ],
             ]
-            .concat()
+            .concat())
         })
-        .collect();
+        .collect::<Result<Vec<Vec<_>>, _>>()?
+        .concat();
 
-    [empty_list, instructions].concat()
+    Ok([empty_list, instructions].concat())
 }
 
 fn to_ascii(c: char) -> usize {
