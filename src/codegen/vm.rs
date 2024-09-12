@@ -148,6 +148,11 @@ pub fn call(function_name: VMFunctionName, argument_count: usize) -> VMInstructi
     VMInstruction::Call(function_name, argument_count)
 }
 
+/// Utility function for pushing the `null` value onto the stack.
+pub fn null() -> VMInstruction {
+    VMInstruction::Push(Segment::Constant, 0)
+}
+
 // endregion
 
 type Index = usize;

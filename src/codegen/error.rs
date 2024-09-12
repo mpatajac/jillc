@@ -6,6 +6,7 @@ pub enum Error {
     VariableAlreadyInScope(String),
     FunctionAlreadyInScope(String),
     VariableNotInScope(String),
+    CaptureNotInScope(String),
     InvalidFunctionReference(String),
     MultipleFunctionDefinitions(vm::VMFunctionName),
 }
