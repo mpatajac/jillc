@@ -78,7 +78,7 @@ impl Scope {
         &mut self,
         name: Name,
         context_arguments: FunctionContextArguments,
-    ) -> FallableAction {
+    ) -> Result<FunctionContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
         match self.search(&name) {
             ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
@@ -93,12 +93,12 @@ impl Scope {
                 // add to list of existing functions
                 self.last_mut_frame()
                     .functions
-                    .insert(name.clone(), context);
+                    .insert(name.clone(), context.clone());
 
                 // create a frame for the new function
                 self.frames.push(ScopeFrame::new(name));
 
-                Ok(())
+                Ok(context)
             }
         }
     }
@@ -118,7 +118,7 @@ impl Scope {
         &mut self,
         name: Name,
         context_arguments: VariableContextArguments,
-    ) -> FallableAction {
+    ) -> Result<VariableContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
         match self.search(&name) {
             ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
@@ -134,8 +134,11 @@ impl Scope {
                     index: segment_index,
                 };
 
-                self.last_mut_frame().variables.insert(name, context);
-                Ok(())
+                self.last_mut_frame()
+                    .variables
+                    .insert(name, context.clone());
+
+                Ok(context)
             }
         }
     }
