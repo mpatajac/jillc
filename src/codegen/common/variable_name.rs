@@ -25,7 +25,7 @@ pub fn construct(
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::context::module::{FunctionContextArguments, VariableContext};
+    use crate::codegen::context::module::{FunctionContextArguments, VariableContextArguments};
 
     use super::*;
 
@@ -43,10 +43,7 @@ mod tests {
             .scope
             .add_variable(
                 "a".to_string(),
-                VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0
-                },
+                VariableContextArguments::new(vm::Segment::Argument),
             )
             .is_ok());
 

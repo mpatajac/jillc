@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter};
+
+use strum::VariantArray;
 
 use crate::codegen::{
     error::{Error, FallableAction},
@@ -112,12 +114,26 @@ impl Scope {
     /// Add a new variable to the (latest frame of the) scope.
     ///
     /// This is usually performed during a variable definition.
-    pub fn add_variable(&mut self, name: Name, context: VariableContext) -> FallableAction {
+    pub fn add_variable(
+        &mut self,
+        name: Name,
+        context_arguments: VariableContextArguments,
+    ) -> FallableAction {
         // check for existing functions/variables with the same name (to prevent shadowing)
         match self.search(&name) {
             ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
             ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
             ScopeSearchOutcome::NotFound => {
+                let segment_index = self
+                    .last_mut_frame()
+                    .variable_segment_indices
+                    .add_variable(context_arguments.segment);
+
+                let context = VariableContext {
+                    segment: context_arguments.segment,
+                    index: segment_index,
+                };
+
                 self.last_mut_frame().variables.insert(name, context);
                 Ok(())
             }
@@ -208,6 +224,7 @@ impl Scope {
 #[derive(Debug)]
 pub struct ScopeFrame {
     owner: Name,
+    variable_segment_indices: VariableSegmentIndices,
     functions: HashMap<Name, FunctionContext>,
     variables: HashMap<Name, VariableContext>,
 }
@@ -216,6 +233,7 @@ impl ScopeFrame {
     fn new(owner: Name) -> Self {
         Self {
             owner,
+            variable_segment_indices: VariableSegmentIndices::new(),
             functions: HashMap::new(),
             variables: HashMap::new(),
         }
@@ -224,12 +242,12 @@ impl ScopeFrame {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContextArguments {
-    pub arity: usize,
-    pub captures: Option<Vec<String>>,
+    arity: usize,
+    captures: Option<Vec<String>>,
 }
 
 impl FunctionContextArguments {
-    pub fn new(arity: usize) -> Self {
+    pub const fn new(arity: usize) -> Self {
         Self {
             arity,
             captures: None,
@@ -252,10 +270,42 @@ pub struct FunctionContext {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariableContextArguments {
+    segment: vm::Segment,
+}
+
+impl VariableContextArguments {
+    pub const fn new(segment: vm::Segment) -> Self {
+        Self { segment }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VariableContext {
-    // TODO?: separate variables by segments?
     pub segment: vm::Segment,
     pub index: usize,
+}
+
+#[derive(Debug)]
+struct VariableSegmentIndices {
+    indices: HashMap<vm::Segment, usize>,
+}
+
+impl VariableSegmentIndices {
+    fn new() -> Self {
+        Self {
+            indices: HashMap::new(),
+        }
+    }
+
+    /// Gets current segment index and increases it for future usage.
+    fn add_variable(&mut self, segment: vm::Segment) -> usize {
+        *self
+            .indices
+            .entry(segment)
+            .and_modify(|idx| *idx += 1)
+            .or_default()
+    }
 }
 
 // endregion
@@ -275,10 +325,7 @@ mod tests {
         assert!(scope
             .add_variable(
                 "foo".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Static,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Static)
             )
             .is_ok());
 
@@ -290,22 +337,21 @@ mod tests {
         assert!(scope
             .add_variable(
                 "a".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
         assert!(scope
             .add_variable(
                 "b".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 1,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
+
+        // check that variable has correct segment index
+        assert!(scope
+            .search_variable(&"b".to_string())
+            .is_some_and(|ctx| ctx.segment == vm::Segment::Argument && ctx.index == 1));
 
         assert_eq!(scope.construct_function_prefix(), String::from("f_"));
 
@@ -319,10 +365,7 @@ mod tests {
         assert!(scope
             .add_variable(
                 "x".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
@@ -340,12 +383,14 @@ mod tests {
         assert!(scope
             .add_variable(
                 "a".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
+
+        // nested scope frame, variable segment indices should reset
+        assert!(scope
+            .search_variable(&"a".to_string())
+            .is_some_and(|ctx| ctx.segment == vm::Segment::Argument && ctx.index == 0));
 
         assert_eq!(scope.construct_function_prefix(), String::from("g_baz_"));
 
@@ -360,10 +405,7 @@ mod tests {
         assert!(scope
             .add_variable(
                 "bar".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Local)
             )
             .is_ok());
 
@@ -390,10 +432,7 @@ mod tests {
         assert!(scope
             .add_variable(
                 "foo".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 1,
-                },
+                super::VariableContextArguments::new(vm::Segment::Local),
             )
             .is_err_and(|err| matches!(err, codegen::error::Error::VariableAlreadyInScope(_))));
     }

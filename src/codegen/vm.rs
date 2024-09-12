@@ -212,7 +212,7 @@ pub enum LabelAction {
     IfGoto,
 }
 
-#[derive(Debug, strum::Display, Clone, PartialEq, Eq)]
+#[derive(Debug, strum::Display, Clone, Copy, PartialEq, Eq, Hash, strum::VariantArray)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Segment {
     Local,
