@@ -1,10 +1,13 @@
-use crate::common::ast;
+use crate::{codegen::vm, common::ast};
 
 pub trait JillFunctionReferenceExtensions {
     fn is_fully_qualified(&self) -> bool;
     fn reconstruct_source_name(&self) -> String;
-    fn to_fully_qualified_hack_name(&self, module_name: &String, function_prefix: String)
-        -> String;
+    fn to_fully_qualified_hack_name(
+        &self,
+        module_name: &String,
+        function_prefix: String,
+    ) -> vm::VMFunctionName;
     fn is_compiler_internal_edge_case(&self) -> bool;
 }
 
@@ -34,7 +37,7 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
         &self,
         local_module_name: &String,
         local_function_prefix: String,
-    ) -> String {
+    ) -> vm::VMFunctionName {
         // format: `Module_Path_Elements.[OptionalType_][optionalFunction_prefixes_]functionName`
         let module_path = if self.is_fully_qualified() {
             self.modules_path
@@ -60,7 +63,7 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
             local_function_prefix + &self.function_name.0
         };
 
-        format!("{module_path}.{type_name}{function_name}")
+        vm::VMFunctionName::construct(&module_path, &type_name, &function_name)
     }
 
     fn is_compiler_internal_edge_case(&self) -> bool {
@@ -91,7 +94,6 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -143,8 +145,8 @@ mod tests {
         let function_prefix = String::new();
 
         assert_eq!(
-            &function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
-            "Test.test"
+            function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
+            vm::VMFunctionName::from_literal("Test.test")
         );
 
         // case 2
@@ -157,8 +159,8 @@ mod tests {
         let function_prefix = String::new();
 
         assert_eq!(
-            &function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
-            "List.map"
+            function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
+            vm::VMFunctionName::from_literal("List.map")
         );
 
         // case 3
@@ -175,8 +177,8 @@ mod tests {
         let function_prefix = String::new();
 
         assert_eq!(
-            &function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
-            "Utils_Primitives_Option.Some_value"
+            function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
+            vm::VMFunctionName::from_literal("Utils_Primitives_Option.Some_value")
         );
 
         // case 4
@@ -189,8 +191,8 @@ mod tests {
         let function_prefix = String::from("bar_baz_");
 
         assert_eq!(
-            &function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
-            "Foo.bar_baz_biz"
+            function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
+            vm::VMFunctionName::from_literal("Foo.bar_baz_biz")
         );
     }
 }

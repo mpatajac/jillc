@@ -80,6 +80,37 @@ impl VMInstructionBlock {
 
 // region: VMInstruction
 
+/// Wrapper type which prevents accidentaly passing non-HACK-formatted
+/// function name where one is required.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VMFunctionName(String);
+
+impl VMFunctionName {
+    /// Create function name from a string literal.
+    ///
+    /// Useful in cases when you know exactly which function
+    /// you want to call (e.g. a built-in).
+    pub fn from_literal(name: &str) -> Self {
+        Self(name.to_owned())
+    }
+
+    /// Construct function name from (processed) components.
+    ///
+    /// Note: this function assumes that module paths are properly formatted
+    /// and type name is empty if it was not originally present.
+    pub fn construct(module_path: &str, type_name: &str, function_name: &str) -> Self {
+        Self(format!("{module_path}.{type_name}{function_name}"))
+    }
+}
+
+impl std::ops::Deref for VMFunctionName {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // region: VMInstruction utility functions
 
 /// Utility function for the `push` VM instruction.
@@ -108,13 +139,13 @@ pub fn label<S: Into<String>>(label_action: LabelAction, label: S) -> VMInstruct
 }
 
 /// Utility function for the `function` VM instruction.
-pub fn function<S: Into<String>>(function_name: S, variable_count: usize) -> VMInstruction {
-    VMInstruction::Function(function_name.into(), variable_count)
+pub fn function(function_name: VMFunctionName, variable_count: usize) -> VMInstruction {
+    VMInstruction::Function(function_name, variable_count)
 }
 
 /// Utility function for the `call` VM instruction.
-pub fn call<S: Into<String>>(function_name: S, argument_count: usize) -> VMInstruction {
-    VMInstruction::Call(function_name.into(), argument_count)
+pub fn call(function_name: VMFunctionName, argument_count: usize) -> VMInstruction {
+    VMInstruction::Call(function_name, argument_count)
 }
 
 // endregion
@@ -122,7 +153,6 @@ pub fn call<S: Into<String>>(function_name: S, argument_count: usize) -> VMInstr
 type Index = usize;
 type Label = String;
 type Count = usize;
-type FunctionName = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VMInstruction {
@@ -130,8 +160,8 @@ pub enum VMInstruction {
     Pop(Segment, Index),
     Command(VMCommand),
     Label(LabelAction, Label),
-    Function(FunctionName, Count),
-    Call(FunctionName, Count),
+    Function(VMFunctionName, Count),
+    Call(VMFunctionName, Count),
 }
 
 impl VMInstruction {
@@ -141,10 +171,12 @@ impl VMInstruction {
             Self::Pop(segment, i) => format!("pop {segment} {i}"),
             Self::Command(command) => command.to_string(),
             Self::Label(label_action, label) => format!("{label_action} {label}"),
-            Self::Function(function_name, variable_count) => {
+            Self::Function(vm_function_name, variable_count) => {
+                let function_name = &vm_function_name.0;
                 format!("function {function_name} {variable_count}")
             }
-            Self::Call(function_name, argument_count) => {
+            Self::Call(vm_function_name, argument_count) => {
+                let function_name = &vm_function_name.0;
                 format!("call {function_name} {argument_count}")
             }
         }

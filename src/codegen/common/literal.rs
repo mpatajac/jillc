@@ -32,7 +32,7 @@ fn construct_integer(i: &isize) -> Vec<vm::VMInstruction> {
 fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
     let string_init = vec![
         vm::push(vm::Segment::Constant, s.len()),
-        vm::call("String.new", 1),
+        vm::call(vm::VMFunctionName::from_literal("String.new"), 1),
     ];
 
     let string_population = s
@@ -40,7 +40,7 @@ fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
         .flat_map(|c| {
             vec![
                 vm::push(vm::Segment::Constant, to_ascii(c)),
-                vm::call("String.appendChar", 2),
+                vm::call(vm::VMFunctionName::from_literal("String.appendChar"), 2),
             ]
         })
         .collect();
@@ -65,7 +65,7 @@ fn construct_list(
     program_context: &mut ProgramContext,
 ) -> Vec<vm::VMInstruction> {
     // start with an empty list
-    let empty_list = vec![vm::call("List.Empty", 0)];
+    let empty_list = vec![vm::call(vm::VMFunctionName::from_literal("List.Empty"), 0)];
 
     if l.is_empty() {
         // no elements, just return the empty list
@@ -86,7 +86,7 @@ fn construct_list(
                     // re-push previous result (to maintain proper element order)
                     vm::push(vm::Segment::Temp, 0),
                     // construct new list "head"
-                    vm::call("List.List", 2),
+                    vm::call(vm::VMFunctionName::from_literal("List.List"), 2),
                 ],
             ]
             .concat()

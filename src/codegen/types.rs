@@ -44,7 +44,8 @@ fn construct_tag(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) {
-    let function_name = format!("{}.tag", module_context.module_name);
+    // "{module_context.module_name}.tag"
+    let function_name = vm::VMFunctionName::construct(&module_context.module_name, "", "tag");
 
     // NOTE: this function is meant for internal usage,
     // so we DO NOT add it to module scope.
@@ -114,7 +115,7 @@ mod variant {
             vec![
                 vm::function(function_name, 0),
                 vm::push(Segment::Constant, number_of_fields),
-                vm::call("Memory.alloc", 1),
+                vm::call(vm::VMFunctionName::from_literal("Memory.alloc"), 1),
                 vm::pop(Segment::Pointer, 0),
             ],
             assignments,
@@ -138,13 +139,17 @@ mod variant {
         program_context: &mut ProgramContext,
     ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
-            let function_name =
-                format!("{}.{}_{}", module_context.module_name, variant.name, field);
+            // "{module_context.module_name}.{variant.name}_{field}"
+            let function_name = vm::VMFunctionName::construct(
+                &module_context.module_name,
+                &format!("{}_", variant.name),
+                &field.0,
+            );
 
             add_function_to_scope(variant, function_name.clone(), module_context)?;
 
             let output_block = vec![
-                vm::function(function_name, 0),
+                vm::function(vm::VMFunctionName::from_literal(&function_name), 0),
                 vm::push(Segment::Argument, 0),
                 vm::pop(Segment::Pointer, 0),
                 // offset by one because `tag` is at `this 0`
@@ -165,13 +170,19 @@ mod variant {
     ) -> FallableAction {
         let ctor_name = ctor_name(variant, module_context);
         let ctor_argument_count = variant.fields.len();
+        let ctor_call = vm::call(ctor_name, ctor_argument_count);
 
         for (variant_index, field) in variant.fields.iter().enumerate() {
-            let function_name = format!(
-                "{}.{}_update{}",
-                module_context.module_name,
-                variant.name,
-                field.0.to_title_case()
+            // let function_name = format!(
+            //     "{}.{}_update{}",
+            //     module_context.module_name,
+            //     variant.name,
+            //     field.0.to_title_case()
+            // );
+            let function_name = vm::VMFunctionName::construct(
+                &module_context.module_name,
+                &format!("{}_", variant.name),
+                &format!("update{}", field.0.to_title_case()),
             );
 
             add_function_to_scope(variant, function_name.clone(), module_context)?;
@@ -198,7 +209,7 @@ mod variant {
                     vm::pop(Segment::Pointer, 0),
                 ],
                 ctor_args,
-                vec![vm::call(&ctor_name, ctor_argument_count), vm::vm_return()],
+                vec![ctor_call.clone(), vm::vm_return()],
             ]
             .concat();
 
@@ -212,11 +223,11 @@ mod variant {
     /// so we can instantly close their frame.
     fn add_function_to_scope(
         variant: &ast::JillTypeVariant,
-        function_name: String,
+        function_name: vm::VMFunctionName,
         module_context: &mut ModuleContext,
     ) -> FallableAction {
         module_context.scope.enter_function(
-            function_name,
+            function_name.to_string(),
             FunctionContextArguments {
                 number_of_arguments: number_of_arguments(variant),
             },
@@ -226,8 +237,12 @@ mod variant {
         Ok(())
     }
 
-    fn ctor_name(variant: &ast::JillTypeVariant, module_context: &ModuleContext) -> String {
-        format!("{}.{}", module_context.module_name, variant.name)
+    fn ctor_name(
+        variant: &ast::JillTypeVariant,
+        module_context: &ModuleContext,
+    ) -> vm::VMFunctionName {
+        // "{module_context.module_name}.{variant.name}"
+        vm::VMFunctionName::construct(&module_context.module_name, "", &variant.name.0)
     }
 
     fn number_of_arguments(variant: &ast::JillTypeVariant) -> usize {

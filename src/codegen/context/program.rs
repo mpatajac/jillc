@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::codegen::jillstd::JillStdUsageTracker;
+use crate::codegen::{jillstd::JillStdUsageTracker, vm};
 
 // region: Context
 
@@ -28,13 +28,12 @@ impl Context {
 
 type FunctionReferenceIndex = usize;
 type FunctionReferenceCount = usize;
-type FunctionReferenceName = String;
 
 /// Track functions which are used as a first-class object
 /// (i.e. function references from AST) for dispatch generation.
 #[derive(Debug)]
 pub struct FunctionDispatch {
-    references: HashMap<FunctionReferenceName, (FunctionReferenceIndex, FunctionReferenceCount)>,
+    references: HashMap<vm::VMFunctionName, (FunctionReferenceIndex, FunctionReferenceCount)>,
 }
 
 impl FunctionDispatch {
@@ -47,7 +46,7 @@ impl FunctionDispatch {
     /// Handle function reference encounter by either
     /// adding it to existing references (if not already present)
     /// or increasing its count.
-    pub fn encounter(&mut self, name: FunctionReferenceName) -> FunctionReferenceIndex {
+    pub fn encounter(&mut self, name: vm::VMFunctionName) -> FunctionReferenceIndex {
         let num_of_items = self.references.len();
 
         self.references
@@ -59,7 +58,7 @@ impl FunctionDispatch {
 
     /// Return a [Vec] of encountered function references with their indices,
     /// ordered by their reference count.
-    pub fn collect(self) -> Vec<(FunctionReferenceName, FunctionReferenceIndex)> {
+    pub fn collect(self) -> Vec<(vm::VMFunctionName, FunctionReferenceIndex)> {
         let mut items: Vec<_> = self.references.into_iter().collect();
 
         // sort items by their count, descending
@@ -73,35 +72,35 @@ impl FunctionDispatch {
     }
 }
 
+// endregion
+
 #[cfg(test)]
 mod tests {
+    use crate::codegen::vm;
+
+    #[allow(clippy::similar_names)]
     #[test]
     fn test_function_dispatch() {
         let mut fn_dispatch = super::FunctionDispatch::new();
 
-        fn_dispatch.encounter(String::from("foo"));
-        fn_dispatch.encounter(String::from("bar"));
-        fn_dispatch.encounter(String::from("foo"));
-        fn_dispatch.encounter(String::from("baz"));
-        fn_dispatch.encounter(String::from("biz"));
-        fn_dispatch.encounter(String::from("bar"));
-        fn_dispatch.encounter(String::from("foo"));
-        fn_dispatch.encounter(String::from("baz"));
-        fn_dispatch.encounter(String::from("foo"));
-        fn_dispatch.encounter(String::from("baz"));
+        let foo = vm::VMFunctionName::from_literal("foo");
+        let baz = vm::VMFunctionName::from_literal("baz");
+        let bar = vm::VMFunctionName::from_literal("bar");
+        let biz = vm::VMFunctionName::from_literal("biz");
+
+        fn_dispatch.encounter(foo.clone());
+        fn_dispatch.encounter(bar.clone());
+        fn_dispatch.encounter(foo.clone());
+        fn_dispatch.encounter(baz.clone());
+        fn_dispatch.encounter(biz.clone());
+        fn_dispatch.encounter(bar.clone());
+        fn_dispatch.encounter(foo.clone());
+        fn_dispatch.encounter(baz.clone());
+        fn_dispatch.encounter(foo.clone());
+        fn_dispatch.encounter(baz.clone());
 
         let collection = fn_dispatch.collect();
 
-        assert_eq!(
-            collection,
-            vec![
-                (String::from("foo"), 0),
-                (String::from("baz"), 2),
-                (String::from("bar"), 1),
-                (String::from("biz"), 3),
-            ]
-        );
+        assert_eq!(collection, vec![(foo, 0), (baz, 2), (bar, 1), (biz, 3),]);
     }
 }
-
-// endregion
