@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::codegen::{jillstd::JillStdUsageTracker, vm};
+use crate::codegen::{
+    error::{Error, FallableAction},
+    jillstd::JillStdUsageTracker,
+    vm,
+};
 
 // region: Context
 
@@ -11,6 +15,7 @@ use crate::codegen::{jillstd::JillStdUsageTracker, vm};
 pub struct Context {
     pub function_dispatch: FunctionDispatch,
     pub std_usage_tracker: JillStdUsageTracker,
+    pub program_metadata: JillProgramMetadata,
 }
 
 impl Context {
@@ -18,6 +23,7 @@ impl Context {
         Self {
             function_dispatch: FunctionDispatch::new(),
             std_usage_tracker: JillStdUsageTracker::new(),
+            program_metadata: JillProgramMetadata::new(),
         }
     }
 }
@@ -74,9 +80,44 @@ impl FunctionDispatch {
 
 // endregion
 
+// region: Program metadata
+
+#[derive(Debug)]
+pub struct JillProgramMetadata {
+    top_level_function_arities: HashMap<vm::VMFunctionName, usize>,
+}
+
+impl JillProgramMetadata {
+    pub fn new() -> Self {
+        Self {
+            top_level_function_arities: HashMap::new(),
+        }
+    }
+
+    pub fn log_function_arity(&mut self, name: vm::VMFunctionName, arity: usize) -> FallableAction {
+        if self
+            .top_level_function_arities
+            .insert(name.clone(), arity)
+            .is_some()
+        {
+            Err(Error::MultipleFunctionDefinitions(name))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn get_function_arity(&self, name: vm::VMFunctionName) -> Option<usize> {
+        self.top_level_function_arities.get(&name).copied()
+    }
+}
+
+// endregion
+
 #[cfg(test)]
 mod tests {
-    use crate::codegen::vm;
+    use crate::codegen::{error::Error, vm};
+
+    use super::JillProgramMetadata;
 
     #[allow(clippy::similar_names)]
     #[test]
@@ -102,5 +143,39 @@ mod tests {
         let collection = fn_dispatch.collect();
 
         assert_eq!(collection, vec![(foo, 0), (baz, 2), (bar, 1), (biz, 3),]);
+    }
+
+    #[test]
+    fn test_program_metadata() {
+        let mut program_metadata = JillProgramMetadata::new();
+
+        // setup
+        assert!(program_metadata
+            .log_function_arity(vm::VMFunctionName::from_literal("Foo.foo"), 2)
+            .is_ok());
+
+        assert!(program_metadata
+            .log_function_arity(vm::VMFunctionName::from_literal("Foo.bar"), 1)
+            .is_ok());
+
+        assert!(program_metadata
+            .log_function_arity(vm::VMFunctionName::from_literal("Bar.bar"), 4)
+            .is_ok());
+
+        // existing function
+        assert_eq!(
+            program_metadata.get_function_arity(vm::VMFunctionName::from_literal("Foo.bar")),
+            Some(1)
+        );
+
+        // non-existing function
+        assert!(program_metadata
+            .get_function_arity(vm::VMFunctionName::from_literal("Foo.baz"))
+            .is_none());
+
+        // duplicate function log
+        assert!(program_metadata
+            .log_function_arity(vm::VMFunctionName::from_literal("Bar.bar"), 4)
+            .is_err_and(|err| matches!(err, Error::MultipleFunctionDefinitions(_))));
     }
 }
