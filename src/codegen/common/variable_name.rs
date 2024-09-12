@@ -36,12 +36,7 @@ mod tests {
 
         assert!(module_context
             .scope
-            .enter_function(
-                "foo".to_string(),
-                FunctionContextArguments {
-                    arity: 1,
-                },
-            )
+            .enter_function("foo".to_string(), FunctionContextArguments::new(1))
             .is_ok());
 
         assert!(module_context

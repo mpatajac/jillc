@@ -76,14 +76,14 @@ mod tests {
 
         assert!(module_context
             .scope
-            .enter_function("foo".to_string(), FunctionContextArguments { arity: 0 },)
+            .enter_function("foo".to_string(), FunctionContextArguments::new(0))
             .is_ok());
 
         module_context.scope.leave_function();
 
         assert!(module_context
             .scope
-            .enter_function("bar".to_string(), FunctionContextArguments { arity: 0 },)
+            .enter_function("bar".to_string(), FunctionContextArguments::new(0))
             .is_ok());
 
         let function_reference = ast::JillFunctionReference {
@@ -111,7 +111,7 @@ mod tests {
 
         assert!(module_context
             .scope
-            .enter_function("foo".to_string(), FunctionContextArguments { arity: 0 },)
+            .enter_function("foo".to_string(), FunctionContextArguments::new(0))
             .is_ok());
 
         module_context.scope.leave_function();

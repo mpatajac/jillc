@@ -85,6 +85,7 @@ impl Scope {
                 let context = FunctionContext {
                     arity: context_arguments.arity,
                     prefix: self.construct_function_prefix(),
+                    captures: context_arguments.captures.unwrap_or_default(),
                 };
 
                 // add to list of existing functions
@@ -224,12 +225,30 @@ impl ScopeFrame {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContextArguments {
     pub arity: usize,
+    pub captures: Option<Vec<String>>,
+}
+
+impl FunctionContextArguments {
+    pub fn new(arity: usize) -> Self {
+        Self {
+            arity,
+            captures: None,
+        }
+    }
+
+    pub fn with_captures(self, captures: Vec<String>) -> Self {
+        Self {
+            captures: Some(captures),
+            ..self
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContext {
     pub arity: usize,
     pub prefix: String,
+    pub captures: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -265,10 +284,7 @@ mod tests {
 
         // fn f a b = _.
         assert!(scope
-            .enter_function(
-                "f".to_string(),
-                super::FunctionContextArguments { arity: 2 },
-            )
+            .enter_function("f".to_string(), super::FunctionContextArguments::new(2))
             .is_ok());
 
         assert!(scope
@@ -297,10 +313,7 @@ mod tests {
 
         // fn g x = ...
         assert!(scope
-            .enter_function(
-                "g".to_string(),
-                super::FunctionContextArguments { arity: 1 },
-            )
+            .enter_function("g".to_string(), super::FunctionContextArguments::new(1))
             .is_ok());
 
         assert!(scope
@@ -314,11 +327,11 @@ mod tests {
             .is_ok());
 
         // nested function
-        // fn baz a = _.
+        // fn baz a [x] = _.
         assert!(scope
             .enter_function(
                 "baz".to_string(),
-                super::FunctionContextArguments { arity: 1 },
+                super::FunctionContextArguments::new(1).with_captures(vec![String::from("x")])
             )
             .is_ok());
 
@@ -336,6 +349,11 @@ mod tests {
 
         assert_eq!(scope.construct_function_prefix(), String::from("g_baz_"));
 
+        // check that capture is part of the context
+        assert!(scope
+            .search_function(&"baz".to_string())
+            .is_some_and(|ctx| ctx.captures == vec!["x"]));
+
         scope.leave_function();
 
         // variable local to the `fn g` scope
@@ -351,7 +369,11 @@ mod tests {
 
         assert!(matches!(
             scope.search_function(&"f".to_string()),
-            Some(super::FunctionContext { arity, prefix })
+            Some(super::FunctionContext {
+                arity,
+                prefix,
+                captures
+            })
         ));
 
         assert!(matches!(

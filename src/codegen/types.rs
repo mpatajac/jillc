@@ -228,9 +228,7 @@ mod variant {
     ) -> FallableAction {
         module_context.scope.enter_function(
             function_name.to_string(),
-            FunctionContextArguments {
-                arity: number_of_arguments(variant),
-            },
+            FunctionContextArguments::new(number_of_arguments(variant)),
         )?;
         module_context.scope.leave_function();
 
