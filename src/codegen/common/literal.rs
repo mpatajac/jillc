@@ -106,7 +106,13 @@ fn to_ascii(c: char) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::vm;
+    use crate::{
+        codegen::{
+            context::{ModuleContext, ProgramContext},
+            vm,
+        },
+        common::ast,
+    };
 
     #[test]
     fn test_positive_integer_construction() {
@@ -155,7 +161,95 @@ mod tests {
     }
 
     #[test]
-    fn test_list_construction() {
-        // TODO!: when expression is implemented
+    fn test_basic_list_construction() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        let number = |i| ast::JillExpression::Literal(ast::JillLiteral::Integer(i));
+
+        let list = vec![number(5), number(2), number(7), number(3)];
+
+        let expected = [
+            "call List.Empty 0",
+            "pop temp 0",
+            "push constant 3",
+            "push temp 0",
+            "call List.List 2",
+            "pop temp 0",
+            "push constant 7",
+            "push temp 0",
+            "call List.List 2",
+            "pop temp 0",
+            "push constant 2",
+            "push temp 0",
+            "call List.List 2",
+            "pop temp 0",
+            "push constant 5",
+            "push temp 0",
+            "call List.List 2",
+        ]
+        .join("\n");
+
+        assert!(
+            super::construct_list(&list, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_nested_list_construction() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        let number = |i| ast::JillExpression::Literal(ast::JillLiteral::Integer(i));
+        let list = |l| ast::JillExpression::Literal(ast::JillLiteral::List(l));
+
+        // [[5, 2], [7, 3]]
+        let lists = vec![
+            list(vec![number(5), number(2)]),
+            list(vec![number(7), number(3)]),
+        ];
+
+        let inner_list_1 = vec![
+            "call List.Empty 0",
+            "pop temp 0",
+            "push constant 2",
+            "push temp 0",
+            "call List.List 2",
+            "pop temp 0",
+            "push constant 5",
+            "push temp 0",
+            "call List.List 2",
+        ];
+
+        let inner_list_2 = vec![
+            "call List.Empty 0",
+            "pop temp 0",
+            "push constant 3",
+            "push temp 0",
+            "call List.List 2",
+            "pop temp 0",
+            "push constant 7",
+            "push temp 0",
+            "call List.List 2",
+        ];
+
+        let expected = [
+            vec!["call List.Empty 0", "pop temp 0"],
+            inner_list_2,
+            vec!["push temp 0", "call List.List 2", "pop temp 0"],
+            inner_list_1,
+            vec!["push temp 0", "call List.List 2"],
+        ]
+        .concat()
+        .join("\n");
+
+        assert!(
+            super::construct_list(&lists, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(dbg!(instructions)).compile()
+                    == expected
+            )
+        );
     }
 }
