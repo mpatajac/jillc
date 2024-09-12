@@ -289,6 +289,20 @@ pub struct VariableContext {
     pub index: usize,
 }
 
+impl VariableContext {
+    /// Helper function for performing a `push`
+    /// action with the variable's segment and index.
+    pub fn push(&self) -> vm::VMInstruction {
+        vm::push(self.segment, self.index)
+    }
+
+    /// Helper function for performing a `pop`
+    /// action with the variable's segment and index.
+    pub fn pop(&self) -> vm::VMInstruction {
+        vm::pop(self.segment, self.index)
+    }
+}
+
 #[derive(Debug)]
 struct VariableSegmentIndices {
     indices: HashMap<vm::Segment, usize>,

@@ -18,7 +18,7 @@ pub fn construct(
         return Err(Error::VariableNotInScope(variable_name.clone()));
     };
 
-    let instructions = vec![vm::push(variable_context.segment, variable_context.index)];
+    let instructions = vec![variable_context.push()];
 
     Ok(instructions)
 }
