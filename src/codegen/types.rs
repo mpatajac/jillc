@@ -44,8 +44,8 @@ fn construct_tag(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) {
-    // "{module_context.module_name}.tag"
-    let function_name = vm::VMFunctionName::construct(&module_context.module_name, "", "tag");
+    // "{module_context.module_name}._tag"
+    let function_name = vm::VMFunctionName::construct(&module_context.module_name, "", "_tag");
 
     // NOTE: this function is meant for internal usage,
     // so we DO NOT add it to module scope.
@@ -279,7 +279,7 @@ mod tests {
         }];
 
         let tag = vec![
-            "function Bar.tag 0",
+            "function Bar._tag 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
@@ -355,7 +355,7 @@ mod tests {
         // `tag` function NOT in scope
         assert!(module_context
             .scope
-            .search_function(&String::from("Bar.tag"))
+            .search_function(&String::from("Bar._tag"))
             .is_none());
     }
 
@@ -381,7 +381,7 @@ mod tests {
         }];
 
         let tag = vec![
-            "function Option.tag 0",
+            "function Option._tag 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
@@ -453,6 +453,11 @@ mod tests {
         assert!(module_context
             .scope
             .search_function(&String::from("Bar.tag"))
+            .is_none());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Bar._tag"))
             .is_none());
     }
 }
