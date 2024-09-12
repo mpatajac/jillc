@@ -229,7 +229,7 @@ mod variant {
         module_context.scope.enter_function(
             function_name.to_string(),
             FunctionContextArguments {
-                number_of_arguments: number_of_arguments(variant),
+                arity: number_of_arguments(variant),
             },
         )?;
         module_context.scope.leave_function();

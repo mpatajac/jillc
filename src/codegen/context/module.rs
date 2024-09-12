@@ -83,7 +83,7 @@ impl Scope {
             ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
             ScopeSearchOutcome::NotFound => {
                 let context = FunctionContext {
-                    arity: context_arguments.number_of_arguments,
+                    arity: context_arguments.arity,
                     prefix: self.construct_function_prefix(),
                 };
 
@@ -223,7 +223,7 @@ impl ScopeFrame {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContextArguments {
-    pub number_of_arguments: usize,
+    pub arity: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -267,9 +267,7 @@ mod tests {
         assert!(scope
             .enter_function(
                 "f".to_string(),
-                super::FunctionContextArguments {
-                    number_of_arguments: 2,
-                },
+                super::FunctionContextArguments { arity: 2 },
             )
             .is_ok());
 
@@ -301,9 +299,7 @@ mod tests {
         assert!(scope
             .enter_function(
                 "g".to_string(),
-                super::FunctionContextArguments {
-                    number_of_arguments: 1,
-                },
+                super::FunctionContextArguments { arity: 1 },
             )
             .is_ok());
 
@@ -322,9 +318,7 @@ mod tests {
         assert!(scope
             .enter_function(
                 "baz".to_string(),
-                super::FunctionContextArguments {
-                    number_of_arguments: 1,
-                },
+                super::FunctionContextArguments { arity: 1 },
             )
             .is_ok());
 

@@ -39,7 +39,7 @@ mod tests {
             .enter_function(
                 "foo".to_string(),
                 FunctionContextArguments {
-                    number_of_arguments: 1,
+                    arity: 1,
                 },
             )
             .is_ok());
