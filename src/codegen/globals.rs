@@ -49,11 +49,11 @@ mod tests {
         let expected = [
             // `foo`
             "push constant 5",
-            "push static 0",
+            "pop static 0",
             // `bar`
             "push constant 1",
             "neg",
-            "push static 1",
+            "pop static 1",
         ]
         .join("\n");
 

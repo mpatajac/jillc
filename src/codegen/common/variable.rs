@@ -27,7 +27,7 @@ pub fn construct(
         VariableContextArguments::new(segment),
     )?;
 
-    let instruction_components = [expression_instructions, vec![variable_context.push()]];
+    let instruction_components = [expression_instructions, vec![variable_context.pop()]];
 
     Ok(instruction_components.concat())
 }
@@ -57,7 +57,7 @@ mod tests {
 
         let segment = vm::Segment::Local;
 
-        let expected = ["push constant 5", "push local 0"].join("\n");
+        let expected = ["push constant 5", "pop local 0"].join("\n");
 
         assert!(construct(
             &variable,
