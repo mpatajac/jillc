@@ -8,9 +8,12 @@ use crate::common::ast;
 mod common;
 pub mod context;
 pub mod error;
+mod globals;
 mod jillstd;
 mod types;
 mod vm;
+
+const GLOBALS_INIT_FN_NAME: &str = "_init__globals";
 
 pub fn construct_module(
     module: ast::JillModule,
@@ -19,8 +22,12 @@ pub fn construct_module(
     let mut module_context = ModuleContext::new(module.name);
 
     types::construct(module.content.types, &mut module_context, program_context)?;
+    globals::construct(
+        module.content.variables,
+        &mut module_context,
+        program_context,
+    )?;
 
-    // TODO: lets (globals)
     // TODO: fns
 
     Ok(module_context.output.compile())
