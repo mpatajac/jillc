@@ -8,6 +8,7 @@ use crate::common::ast;
 mod common;
 pub mod context;
 pub mod error;
+mod globals;
 mod jillstd;
 mod types;
 mod vm;
