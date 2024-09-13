@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::codegen::{
     error::{Error, FallableAction},
@@ -8,6 +8,8 @@ use crate::codegen::{
 
 // region: Context
 
+type ModuleName = String;
+
 /// Context information regarding the entire program, across modules
 /// (e.g. which parts of the `std` need to be generated,
 /// which functions need to be dispatched etc.).
@@ -16,6 +18,7 @@ pub struct Context {
     pub function_dispatch: FunctionDispatch,
     pub std_usage_tracker: JillStdUsageTracker,
     pub program_metadata: JillProgramMetadata,
+    pub globals: HashSet<ModuleName>,
 }
 
 impl Context {
@@ -24,6 +27,7 @@ impl Context {
             function_dispatch: FunctionDispatch::new(),
             std_usage_tracker: JillStdUsageTracker::new(),
             program_metadata: JillProgramMetadata::new(),
+            globals: HashSet::new(),
         }
     }
 }
