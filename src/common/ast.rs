@@ -57,7 +57,6 @@ pub struct JillTypeVariant {
 #[derive(Debug)]
 pub enum JillExpression {
     Literal(JillLiteral),
-    // TODO?: differentiate function call types (full, type, local, variable)
     FunctionCall(JillFunctionCall),
     FunctionReference(JillFunctionReference),
     VariableName(JillIdentifier),

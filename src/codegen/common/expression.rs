@@ -6,7 +6,7 @@ use crate::{
     common::ast,
 };
 
-use super::{function_reference, literal, variable_name};
+use super::{function_call, function_reference, literal, variable_name};
 
 pub fn construct(
     expression: &ast::JillExpression,
@@ -23,7 +23,9 @@ pub fn construct(
         ast::JillExpression::FunctionReference(function_reference) => {
             function_reference::construct(function_reference, module_context, program_context)
         }
-        ast::JillExpression::FunctionCall(_) => todo!(),
+        ast::JillExpression::FunctionCall(function_call) => {
+            function_call::construct(function_call, module_context, program_context)
+        }
     }
 }
 
