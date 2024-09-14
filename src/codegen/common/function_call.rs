@@ -136,7 +136,11 @@ mod variable_call {
 }
 
 mod direct_call {
-    use crate::codegen::error::FallableInstructions;
+    use crate::codegen::{
+        common::{expression, helpers::function::JillFunctionReferenceExtensions},
+        error::FallableInstructions,
+        vm,
+    };
 
     use super::{ast, ModuleContext, ProgramContext};
 
@@ -145,16 +149,28 @@ mod direct_call {
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
-        todo!()
+        let argument_instructions = function_call
+            .arguments
+            .iter()
+            .map(|expr| expression::construct(expr, module_context, program_context))
+            .collect::<Result<Vec<_>, _>>()?
+            .concat();
+
+        let call = vec![vm::call(
+            // TODO!: figure out naming
+            function_call
+                .reference
+                .to_fully_qualified_hack_name(&String::new(), String::new()),
+            function_call.arguments.len(),
+        )];
+
+        Ok([argument_instructions, call].concat())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::{
-        context::module::{FunctionContextArguments, VariableContextArguments},
-        vm,
-    };
+    use crate::codegen::{context::module::VariableContextArguments, vm};
 
     use super::*;
 
@@ -212,6 +228,40 @@ mod tests {
         assert_eq!(
             determine_function_call_kind(&function_reference, &module_context),
             FunctionCallKind::Variable
+        );
+    }
+
+    #[test]
+    fn test_direct_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Foo"))],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("bar")),
+        };
+        let arguments = vec![
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            "push constant 5",
+            "push constant 7",
+            "neg",
+            "call Foo.bar 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
         );
     }
 }
