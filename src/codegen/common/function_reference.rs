@@ -1,10 +1,7 @@
 use crate::{
     codegen::{
-        common::helpers::function::JillFunctionReferenceExtensions,
-        context::{
-            module::{FunctionContext, VariableContext},
-            ModuleContext, ProgramContext,
-        },
+        common::helpers::{self, function::JillFunctionReferenceExtensions},
+        context::{module::FunctionContext, ModuleContext, ProgramContext},
         error::{Error, FallableInstructions},
         jillstd, vm,
     },
@@ -51,7 +48,7 @@ pub fn construct(
 
     // collect function captures (if any are present)
     let function_captures = function_context.map_or(Vec::new(), |ctx| ctx.captures);
-    let captures_instructions = construct_captures_array(&function_captures, module_context)?;
+    let captures_instructions = construct_captures_array(function_captures, module_context)?;
 
     let instructions = [
         vec![vm::push(vm::Segment::Constant, function_id)],
@@ -73,58 +70,20 @@ fn is_valid_function_reference(
 }
 
 fn construct_captures_array(
-    function_captures: &Vec<String>,
-    module_context: &mut ModuleContext,
+    function_captures: Vec<String>,
+    module_context: &ModuleContext,
 ) -> FallableInstructions {
-    if function_captures.is_empty() {
-        return Ok(vec![vm::null()]);
-    }
-
-    let captures_array = VariableContext {
-        segment: vm::Segment::Temp,
-        // keep `temp 0` for array usage
-        index: 1,
+    let captures_instructions = |capture_name| {
+        module_context
+            .scope
+            .search_variable(&capture_name)
+            .map_or_else(
+                || Err(Error::CaptureNotInScope(capture_name.to_string())),
+                |capture_variable_context| Ok(vec![capture_variable_context.push()]),
+            )
     };
 
-    let array_init_instructions = vec![
-        vm::push(vm::Segment::Constant, function_captures.len()),
-        vm::call(vm::VMFunctionName::from_literal("Array.new"), 1),
-        captures_array.pop(),
-    ];
-
-    let build_capture_array_instructions = function_captures
-        .iter()
-        .enumerate()
-        .map(|(index, capture_name)| {
-            module_context
-                .scope
-                .search_variable(capture_name)
-                .map_or_else(
-                    || Err(Error::CaptureNotInScope(capture_name.to_string())),
-                    |capture_variable_context| {
-                        Ok([
-                            vm::push(vm::Segment::Constant, index),
-                            captures_array.push(),
-                            vm::command(vm::VMCommand::Add),
-                            capture_variable_context.push(),
-                            vm::pop(vm::Segment::Temp, 0),
-                            vm::pop(vm::Segment::Pointer, 1),
-                            vm::push(vm::Segment::Temp, 0),
-                            vm::pop(vm::Segment::That, 0),
-                        ])
-                    },
-                )
-        })
-        .collect::<Result<Vec<_>, Error>>()?
-        .concat();
-
-    Ok([
-        array_init_instructions,
-        build_capture_array_instructions,
-        // add array to stack as function call argument
-        vec![captures_array.push()],
-    ]
-    .concat())
+    helpers::array::build_array_instructions(function_captures, captures_instructions)
 }
 
 fn invalid_function_reference(
