@@ -1,7 +1,7 @@
 use crate::{
     codegen::{
         context::{module::VariableContextArguments, ModuleContext, ProgramContext},
-        error::Error,
+        error::FallableInstructions,
         vm,
     },
     common::ast,
@@ -16,7 +16,7 @@ pub fn construct(
     segment: vm::Segment,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     // (try to) evaluate assigned expression
     let expression_instructions =
         expression::construct(&variable.value, module_context, program_context)?;

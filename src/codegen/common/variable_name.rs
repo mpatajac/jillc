@@ -1,8 +1,7 @@
 use crate::{
     codegen::{
         context::{ModuleContext, ProgramContext},
-        error::Error,
-        vm,
+        error::{Error, FallableInstructions},
     },
     common::ast,
 };
@@ -11,7 +10,7 @@ pub fn construct(
     variable: &ast::JillIdentifier,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     let variable_name = &variable.0;
 
     let Some(variable_context) = module_context.scope.search_variable(variable_name) else {
@@ -25,7 +24,10 @@ pub fn construct(
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::context::module::{FunctionContextArguments, VariableContextArguments};
+    use crate::codegen::{
+        context::module::{FunctionContextArguments, VariableContextArguments},
+        vm,
+    };
 
     use super::*;
 

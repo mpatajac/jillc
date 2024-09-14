@@ -12,3 +12,4 @@ pub enum Error {
 }
 
 pub type FallableAction = Result<(), Error>;
+pub type FallableInstructions = Result<Vec<vm::VMInstruction>, Error>;

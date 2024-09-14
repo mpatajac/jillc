@@ -5,7 +5,7 @@ use crate::{
             module::{FunctionContext, VariableContext},
             ModuleContext, ProgramContext,
         },
-        error::Error,
+        error::{Error, FallableInstructions},
         jillstd, vm,
     },
     common::ast,
@@ -15,7 +15,7 @@ pub fn construct(
     function_reference: &ast::JillFunctionReference,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     let function_context = module_context
         .scope
         .search_function(&function_reference.function_name.0);
@@ -74,7 +74,7 @@ fn is_valid_function_reference(
 fn construct_captures_array(
     function_captures: &Vec<String>,
     module_context: &mut ModuleContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     if function_captures.is_empty() {
         return Ok(vec![vm::null()]);
     }
@@ -128,7 +128,7 @@ fn construct_captures_array(
 
 fn invalid_function_reference(
     function_reference: &ast::JillFunctionReference,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     Err(Error::InvalidFunctionReference(
         function_reference.reconstruct_source_name(),
     ))

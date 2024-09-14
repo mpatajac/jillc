@@ -1,8 +1,7 @@
 use crate::{
     codegen::{
         context::{ModuleContext, ProgramContext},
-        error::Error,
-        vm,
+        error::FallableInstructions,
     },
     common::ast,
 };
@@ -13,7 +12,7 @@ pub fn construct(
     expression: &ast::JillExpression,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     match expression {
         ast::JillExpression::Literal(literal) => {
             literal::construct(literal, module_context, program_context)
@@ -30,6 +29,8 @@ pub fn construct(
 
 #[cfg(test)]
 mod tests {
+    use crate::codegen::vm;
+
     use super::*;
 
     #[test]

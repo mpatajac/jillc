@@ -1,13 +1,15 @@
 use crate::{
     codegen::{
         context::{ModuleContext, ProgramContext},
-        error::Error,
         vm,
     },
     common::ast,
 };
 
-use super::{error::FallableAction, GLOBALS_INIT_FN_NAME};
+use super::{
+    error::{FallableAction, FallableInstructions},
+    GLOBALS_INIT_FN_NAME,
+};
 
 pub fn construct(
     globals: Vec<ast::JillVariable>,
@@ -44,7 +46,7 @@ fn construct_globals(
     globals: &Vec<ast::JillVariable>,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     globals
         .iter()
         .map(|variable| {

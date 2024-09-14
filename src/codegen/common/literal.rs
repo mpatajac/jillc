@@ -1,7 +1,7 @@
 use crate::{
     codegen::{
         context::{ModuleContext, ProgramContext},
-        error::Error,
+        error::FallableInstructions,
         vm,
     },
     common::ast,
@@ -11,7 +11,7 @@ pub fn construct(
     literal: &ast::JillLiteral,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     let instructions = match literal {
         ast::JillLiteral::Integer(i) => construct_integer(i),
         ast::JillLiteral::String(s) => construct_string(s),
@@ -66,7 +66,7 @@ fn construct_list(
     list: &Vec<ast::JillExpression>,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<Vec<vm::VMInstruction>, Error> {
+) -> FallableInstructions {
     // start with an empty list
     let empty_list = vec![vm::call(vm::VMFunctionName::from_literal("List.Empty"), 0)];
 
