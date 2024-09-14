@@ -48,7 +48,7 @@ pub fn construct(
 
     // collect function captures (if any are present)
     let function_captures = function_context.map_or(Vec::new(), |ctx| ctx.captures);
-    let captures_instructions = construct_captures_array(function_captures, module_context)?;
+    let captures_instructions = construct_captures_array(&function_captures, module_context)?;
 
     let instructions = [
         vec![vm::push(vm::Segment::Constant, function_id)],
@@ -70,20 +70,18 @@ fn is_valid_function_reference(
 }
 
 fn construct_captures_array(
-    function_captures: Vec<String>,
+    function_captures: &Vec<String>,
     module_context: &ModuleContext,
 ) -> FallableInstructions {
-    let captures_instructions = |capture_name| {
+    helpers::array::build_array_instructions(function_captures, |capture_name| {
         module_context
             .scope
-            .search_variable(&capture_name)
+            .search_variable(capture_name)
             .map_or_else(
                 || Err(Error::CaptureNotInScope(capture_name.to_string())),
                 |capture_variable_context| Ok(vec![capture_variable_context.push()]),
             )
-    };
-
-    helpers::array::build_array_instructions(function_captures, captures_instructions)
+    })
 }
 
 fn invalid_function_reference(

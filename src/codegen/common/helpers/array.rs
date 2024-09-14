@@ -1,11 +1,11 @@
 use crate::codegen::{context::module::VariableContext, error::FallableInstructions, vm};
 
 pub fn build_array_instructions<T, F>(
-    array_items: Vec<T>,
+    array_items: &[T],
     mut item_instructions: F,
 ) -> FallableInstructions
 where
-    F: FnMut(T) -> FallableInstructions,
+    F: FnMut(&T) -> FallableInstructions,
 {
     if array_items.is_empty() {
         return Ok(vec![vm::null()]);
@@ -24,7 +24,7 @@ where
     ];
 
     let array_items_instructions = array_items
-        .into_iter()
+        .iter()
         .enumerate()
         .map(|(index, item)| {
             Ok([
