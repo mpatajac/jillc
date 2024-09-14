@@ -18,6 +18,7 @@ pub fn construct(
 ) -> FallableInstructions {
     let function_context = module_context
         .scope
+        // TODO!: figure out naming
         .search_function(&function_reference.function_name.0);
 
     if !is_valid_function_reference(function_reference, &function_context) {

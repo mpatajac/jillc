@@ -347,6 +347,7 @@ mod tests {
         // function added to scope
         assert!(module_context
             .scope
+            // TODO!: figure out naming
             .search_function(&String::from("Bar.Bar_updateFoo1"))
             .is_some());
 

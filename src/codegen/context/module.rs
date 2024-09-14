@@ -145,6 +145,7 @@ impl Scope {
 
     /// Search through the scope frames for a function with
     /// a given identifier, returning its context upon a successful search.
+    // TODO!: figure out how (in what form) to store names!!!!!
     pub fn search_function(&self, identifier: &Name) -> Option<FunctionContext> {
         self.frames
             .iter()
