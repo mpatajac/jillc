@@ -3,6 +3,7 @@ use crate::codegen::{context::module::VariableContext, error::FallableInstructio
 pub fn build_array_instructions<T, F>(
     array_items: &[T],
     mut item_instructions: F,
+    push_resulting_array: bool,
 ) -> FallableInstructions
 where
     F: FnMut(&T) -> FallableInstructions,
@@ -46,11 +47,11 @@ where
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
-    Ok([
-        array_init_instructions,
-        array_items_instructions,
-        // add array to stack as function call argument
-        vec![array.push()],
-    ]
-    .concat())
+    let mut instructions = vec![array_init_instructions, array_items_instructions];
+
+    if push_resulting_array {
+        instructions.push(vec![array.push()]);
+    }
+
+    Ok(instructions.concat())
 }

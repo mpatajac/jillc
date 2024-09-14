@@ -73,15 +73,19 @@ fn construct_captures_array(
     function_captures: &Vec<String>,
     module_context: &ModuleContext,
 ) -> FallableInstructions {
-    helpers::array::build_array_instructions(function_captures, |capture_name| {
-        module_context
-            .scope
-            .search_variable(capture_name)
-            .map_or_else(
-                || Err(Error::CaptureNotInScope(capture_name.to_string())),
-                |capture_variable_context| Ok(vec![capture_variable_context.push()]),
-            )
-    })
+    helpers::array::build_array_instructions(
+        function_captures,
+        |capture_name| {
+            module_context
+                .scope
+                .search_variable(capture_name)
+                .map_or_else(
+                    || Err(Error::CaptureNotInScope(capture_name.to_string())),
+                    |capture_variable_context| Ok(vec![capture_variable_context.push()]),
+                )
+        },
+        true,
+    )
 }
 
 fn invalid_function_reference(
