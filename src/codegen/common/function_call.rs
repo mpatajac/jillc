@@ -4,7 +4,7 @@ use strum::VariantNames;
 
 use crate::{
     codegen::{
-        context::{ModuleContext, ProgramContext},
+        context::{module::VariableContext, ModuleContext, ProgramContext},
         error::{Error, FallableInstructions},
     },
     common::{ast, CompilerInternalFunction},
@@ -26,9 +26,12 @@ pub fn construct(
                 program_context,
             )
         }
-        FunctionCallKind::Variable => {
-            variable_call::construct(function_call, module_context, program_context)
-        }
+        FunctionCallKind::Variable(variable_context) => variable_call::construct(
+            function_call,
+            variable_context,
+            module_context,
+            program_context,
+        ),
         FunctionCallKind::Direct => {
             direct_call::construct(function_call, module_context, program_context)
         }
@@ -45,7 +48,7 @@ fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstr
 #[derive(Debug, PartialEq, Eq)]
 enum FunctionCallKind {
     CompilerInternal(CompilerInternalFunction),
-    Variable,
+    Variable(VariableContext),
     Direct,
     Invalid,
 }
@@ -70,12 +73,8 @@ fn determine_function_call_kind(
     // but they are also registered as a module-local function
     if !function_reference.is_fully_qualified() {
         // check "variable" case
-        if module_context
-            .scope
-            .search_variable(function_name)
-            .is_some()
-        {
-            return FunctionCallKind::Variable;
+        if let Some(variable_context) = module_context.scope.search_variable(function_name) {
+            return FunctionCallKind::Variable(variable_context);
         }
 
         // check "function" case
@@ -122,16 +121,35 @@ mod compiler_internal_call {
 }
 
 mod variable_call {
-    use crate::codegen::error::FallableInstructions;
+    use crate::codegen::{
+        common::{expression, helpers},
+        context::module::VariableContext,
+        error::FallableInstructions,
+        vm,
+    };
 
     use super::{ast, ModuleContext, ProgramContext};
 
     pub(super) fn construct(
         function_call: &ast::JillFunctionCall,
+        variable_context: VariableContext,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
-        todo!()
+        let arguments_array_instructions = helpers::array::build_array_instructions(
+            &function_call.arguments,
+            |expr| expression::construct(expr, module_context, program_context),
+            false,
+        )?;
+
+        let call_instructions = vec![
+            variable_context.push(),
+            // TODO: `request` index from scope
+            vm::push(vm::Segment::Temp, 1),
+            vm::call(vm::VMFunctionName::from_literal("Fn._call"), 2),
+        ];
+
+        Ok([arguments_array_instructions, call_instructions].concat())
     }
 }
 
@@ -225,10 +243,10 @@ mod tests {
             associated_type: None,
             function_name: ast::JillIdentifier(String::from("foo")),
         };
-        assert_eq!(
+        assert!(matches!(
             determine_function_call_kind(&function_reference, &module_context),
-            FunctionCallKind::Variable
-        );
+            FunctionCallKind::Variable(_)
+        ));
     }
 
     #[test]
@@ -255,6 +273,71 @@ mod tests {
             "push constant 7",
             "neg",
             "call Foo.bar 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_variable_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                "foo".to_string(),
+                VariableContextArguments::new(vm::Segment::Local)
+            )
+            .is_ok());
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("foo")),
+        };
+        let arguments = vec![
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            // create array
+            "push constant 2",
+            "call Array.new 1",
+            "pop temp 1",
+            // add `5`
+            "push constant 0",
+            "push temp 1",
+            "add",
+            "push constant 5",
+            "pop temp 0",
+            "pop pointer 1",
+            "push temp 0",
+            "pop that 0",
+            // add `-7`
+            "push constant 1",
+            "push temp 1",
+            "add",
+            "push constant 7",
+            "neg",
+            "pop temp 0",
+            "pop pointer 1",
+            "push temp 0",
+            "pop that 0",
+            // call
+            "push local 0",
+            "push temp 1",
+            "call Fn._call 2",
         ]
         .join("\n");
 
