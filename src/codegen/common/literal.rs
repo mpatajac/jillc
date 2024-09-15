@@ -53,12 +53,9 @@ fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
 
 fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
     if *b {
-        vec![
-            vm::push(vm::Segment::Constant, 1),
-            vm::command(vm::VMCommand::Neg),
-        ]
+        vm::r#true()
     } else {
-        vec![vm::push(vm::Segment::Constant, 0)]
+        vec![vm::r#false()]
     }
 }
 
