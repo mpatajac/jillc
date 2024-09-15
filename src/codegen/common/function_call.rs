@@ -36,7 +36,7 @@ pub fn construct(
             program_context,
         ),
         FunctionCallKind::ModuleLocalFunction(function_context) => {
-            module_local_function_call::construct(
+            direct_call::construct_module_local(
                 function_call,
                 function_context,
                 module_context,
@@ -44,7 +44,7 @@ pub fn construct(
             )
         }
         FunctionCallKind::ModuleForeignFunction => {
-            module_foreign_function_call::construct(function_call, module_context, program_context)
+            direct_call::construct_module_foreign(function_call, module_context, program_context)
         }
         FunctionCallKind::Invalid => invalid_function_call(function_call),
     }
@@ -167,32 +167,52 @@ mod variable_call {
     }
 }
 
-mod module_local_function_call {
-    use crate::codegen::{context::module::FunctionContext, error::FallableInstructions};
-
-    use super::{ast, ModuleContext, ProgramContext};
-
-    pub(super) fn construct(
-        function_call: &ast::JillFunctionCall,
-        function_context: FunctionContext,
-        module_context: &mut ModuleContext,
-        program_context: &mut ProgramContext,
-    ) -> FallableInstructions {
-        todo!()
-    }
-}
-
-mod module_foreign_function_call {
+mod direct_call {
     use crate::codegen::{
         common::{expression, helpers::function::JillFunctionReferenceExtensions},
+        context::module::FunctionContext,
         error::FallableInstructions,
         vm,
     };
 
     use super::{ast, ModuleContext, ProgramContext};
 
-    pub(super) fn construct(
+    pub(super) fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        construct(function_call, None, module_context, program_context)
+    }
+
+    pub(super) fn construct_module_local(
+        function_call: &ast::JillFunctionCall,
+        function_context: FunctionContext,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        let local_call_info = LocalCallInfo {
+            module_name: module_context.module_name.clone(),
+            prefix: function_context.prefix,
+        };
+
+        construct(
+            function_call,
+            Some(local_call_info),
+            module_context,
+            program_context,
+        )
+    }
+
+    #[derive(Debug, Default, Clone)]
+    struct LocalCallInfo {
+        module_name: String,
+        prefix: String,
+    }
+
+    fn construct(
+        function_call: &ast::JillFunctionCall,
+        local_call_info: Option<LocalCallInfo>,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -205,9 +225,10 @@ mod module_foreign_function_call {
 
         let call = vec![vm::call(
             // TODO!: figure out naming
-            function_call
-                .reference
-                .to_fully_qualified_hack_name(&String::new(), String::new()),
+            function_call.reference.to_fully_qualified_hack_name(
+                &local_call_info.clone().unwrap_or_default().module_name,
+                local_call_info.unwrap_or_default().prefix,
+            ),
             function_call.arguments.len(),
         )];
 
@@ -217,7 +238,10 @@ mod module_foreign_function_call {
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::{context::module::VariableContextArguments, vm};
+    use crate::codegen::{
+        context::module::{FunctionContextArguments, VariableContextArguments},
+        vm,
+    };
 
     use super::*;
 
@@ -302,6 +326,91 @@ mod tests {
             "push constant 7",
             "neg",
             "call Foo.bar 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_module_local_function_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // top level module-local function
+        assert!(module_context
+            .scope
+            .enter_function(String::from("foo"), FunctionContextArguments::new(2))
+            .is_ok());
+
+        module_context.scope.leave_function();
+
+        assert!(module_context
+            .scope
+            .enter_function(String::from("bar"), FunctionContextArguments::new(2))
+            .is_ok());
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("foo")),
+        };
+        let arguments = vec![
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            "push constant 5",
+            "push constant 7",
+            "neg",
+            "call Test.foo 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+
+        // --------------------------------
+
+        // nested module-local function
+        assert!(module_context
+            .scope
+            .enter_function(String::from("baz"), FunctionContextArguments::new(2))
+            .is_ok());
+
+        module_context.scope.leave_function();
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("baz")),
+        };
+        let arguments = vec![
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            "push constant 5",
+            "push constant 7",
+            "neg",
+            "call Test.bar_baz 2",
         ]
         .join("\n");
 
