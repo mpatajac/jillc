@@ -135,6 +135,9 @@ mod compiler_internal_call {
             CompilerInternalFunction::If => {
                 construct_if(function_call, module_context, program_context)
             }
+            CompilerInternalFunction::IfElse => {
+                construct_if_else(function_call, module_context, program_context)
+            }
             _ => todo!(),
         }
     }
@@ -185,6 +188,77 @@ mod compiler_internal_call {
             condition_instructions,
             expression::construct(action, module_context, program_context)?,
             vec![vm::label(vm::LabelAction::Label, skip_if_label)],
+        ];
+
+        // endregion
+
+        Ok(instructions.concat())
+    }
+
+    fn construct_if_else(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        let function_reference = &function_call.reference;
+
+        // region: Validation
+
+        // `ifElse` cannot be preceded (have module path or associated type)
+        if is_preceded(function_reference) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // `ifElse` MUST contain EXACTLY 3 expressions -
+        // one which will be evaluated as a condition
+        // one which will be performed if condition is fulfilled
+        // and one which will be performed if condition is not fulfilled
+        if function_call.arguments.len() != 3 {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // endregion
+
+        // region: Construction
+
+        let condition = &function_call.arguments[0];
+        let true_expression = &function_call.arguments[1];
+        let false_expression = &function_call.arguments[2];
+
+        let skip_true_label = module_context.scope.create_label("SKIP_TRUE");
+        let skip_false_label = module_context.scope.create_label("SKIP_FALSE");
+
+        // evaluate condition - if it is false, skip the provided action
+        let condition_instructions = [
+            expression::construct(condition, module_context, program_context)?,
+            vec![
+                vm::r#false(),
+                vm::command(vm::VMCommand::Eq),
+                vm::label(vm::LabelAction::IfGoto, skip_true_label.clone()),
+            ],
+        ]
+        .concat();
+
+        // evaluate "true" expression, skip false
+        let true_instructions = [
+            expression::construct(true_expression, module_context, program_context)?,
+            vec![vm::label(vm::LabelAction::Goto, skip_false_label.clone())],
+        ]
+        .concat();
+
+        // point to skip "true" to, evaluate "false" expression, point to skip "false" to
+        let false_instructions = [
+            vec![vm::label(vm::LabelAction::Label, skip_true_label)],
+            expression::construct(false_expression, module_context, program_context)?,
+            vec![vm::label(vm::LabelAction::Label, skip_false_label)],
+        ]
+        .concat();
+
+        // condition check -> expr if true -> expr if false
+        let instructions = [
+            condition_instructions,
+            true_instructions,
+            false_instructions,
         ];
 
         // endregion
@@ -624,6 +698,60 @@ mod tests {
             "if-goto SKIP_IF_0",
             "call Other.action 0",
             "label SKIP_IF_0",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_if_else_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // `ifElse(b, 5, -7)`
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("b"),
+                VariableContextArguments::new(vm::Segment::Local),
+            )
+            .is_ok());
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("ifElse")),
+        };
+        let arguments = vec![
+            ast::JillExpression::VariableName(ast::JillIdentifier(String::from("b"))),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            // condition check
+            "push local 0",
+            "push constant 0",
+            "eq",
+            "if-goto SKIP_TRUE_0",
+            // true
+            "push constant 5",
+            "goto SKIP_FALSE_0",
+            // false
+            "label SKIP_TRUE_0",
+            "push constant 7",
+            "neg",
+            "label SKIP_FALSE_0",
         ]
         .join("\n");
 
