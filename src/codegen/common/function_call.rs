@@ -172,16 +172,26 @@ mod direct_call {
         common::{expression, helpers::function::JillFunctionReferenceExtensions},
         context::module::FunctionContext,
         error::FallableInstructions,
-        vm,
+        jillstd, vm,
     };
 
-    use super::{ast, ModuleContext, ProgramContext};
+    use super::{ast, invalid_function_call, ModuleContext, ProgramContext};
 
     pub(super) fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
+        // track (potential) `JillStd` function occurences
+        let std_function_usage_note_outcome = program_context
+            .std_usage_tracker
+            .note_usage(&function_call.reference);
+        if std_function_usage_note_outcome
+            == jillstd::JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule
+        {
+            return invalid_function_call(function_call);
+        }
+
         construct(function_call, None, module_context, program_context)
     }
 
