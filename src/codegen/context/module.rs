@@ -223,12 +223,27 @@ impl Scope {
 
         ScopeSearchOutcome::NotFound
     }
+
+    /// Gets current label index and increases it for future usage.
+    pub fn create_label(&mut self, label: &str) -> String {
+        let label_index = *self
+            .last_mut_frame()
+            .compiler_internal_function_labels
+            .entry(label.to_owned())
+            .and_modify(|idx| *idx += 1)
+            .or_default();
+
+        format!("{label}_{label_index}")
+    }
 }
+
+type Label = String;
 
 #[derive(Debug)]
 pub struct ScopeFrame {
     owner: Name,
     variable_segment_indices: VariableSegmentIndices,
+    compiler_internal_function_labels: HashMap<Label, usize>,
     functions: HashMap<Name, FunctionContext>,
     variables: HashMap<Name, VariableContext>,
 }
@@ -238,6 +253,7 @@ impl ScopeFrame {
         Self {
             owner,
             variable_segment_indices: VariableSegmentIndices::new(),
+            compiler_internal_function_labels: HashMap::new(),
             functions: HashMap::new(),
             variables: HashMap::new(),
         }
