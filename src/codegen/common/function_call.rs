@@ -138,10 +138,13 @@ mod compiler_internal_call {
             CompilerInternalFunction::IfElse => {
                 construct_if_else(function_call, module_context, program_context)
             }
+            CompilerInternalFunction::Do => {
+                construct_do(function_call, module_context, program_context)
+            }
+            CompilerInternalFunction::Match => todo!(),
             CompilerInternalFunction::Todo => {
                 construct_todo(function_call, module_context, program_context)
             }
-            _ => todo!(),
         }
     }
 
@@ -269,6 +272,57 @@ mod compiler_internal_call {
         Ok(instructions.concat())
     }
 
+    fn construct_do(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        let function_reference = &function_call.reference;
+
+        // region: Validation
+
+        // `do` cannot be preceded (have module path or associated type)
+        if is_preceded(function_reference) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // `do` MUST contain AT LEAST 1 argument -
+        // function calls to perform (and discard)
+        if function_call.arguments.is_empty() {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // check that the arguments are function calls
+        if !function_call.arguments.iter().all(is_function_call) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // endregion
+
+        // region: Construction
+
+        // add `pop temp 0` after every call to discard result
+        let mut instructions = function_call
+            .arguments
+            .iter()
+            .map(|expr| {
+                Ok([
+                    expression::construct(expr, module_context, program_context)?,
+                    vec![vm::pop(vm::Segment::Temp, 0)],
+                ]
+                .concat())
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .concat();
+
+        // remove the last `pop` to maintain the last result
+        instructions.truncate(instructions.len() - 1);
+
+        // endregion
+
+        Ok(instructions)
+    }
+
     fn construct_todo(
         function_call: &ast::JillFunctionCall,
         module_context: &mut ModuleContext,
@@ -323,6 +377,10 @@ mod compiler_internal_call {
 
     fn is_preceded(function_reference: &ast::JillFunctionReference) -> bool {
         is_module_preceded(function_reference) || is_type_preceded(function_reference)
+    }
+
+    fn is_function_call(expr: &ast::JillExpression) -> bool {
+        matches!(expr, ast::JillExpression::FunctionCall(_))
     }
 
     fn is_string(expr: &ast::JillExpression) -> bool {
@@ -806,6 +864,54 @@ mod tests {
             "label SKIP_FALSE_0",
         ]
         .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_do_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // `do(One::thing(), Other::action())`
+
+        let one_thing = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("One"))],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("thing")),
+        };
+
+        let other_action = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Other"))],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("action")),
+        };
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("do")),
+        };
+        let arguments = vec![
+            ast::JillExpression::FunctionCall(ast::JillFunctionCall {
+                reference: one_thing,
+                arguments: vec![],
+            }),
+            ast::JillExpression::FunctionCall(ast::JillFunctionCall {
+                reference: other_action,
+                arguments: vec![],
+            }),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = ["call One.thing 0", "pop temp 0", "call Other.action 0"].join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
