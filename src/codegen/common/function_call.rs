@@ -138,6 +138,9 @@ mod compiler_internal_call {
             CompilerInternalFunction::IfElse => {
                 construct_if_else(function_call, module_context, program_context)
             }
+            CompilerInternalFunction::Todo => {
+                construct_todo(function_call, module_context, program_context)
+            }
             _ => todo!(),
         }
     }
@@ -266,6 +269,48 @@ mod compiler_internal_call {
         Ok(instructions.concat())
     }
 
+    fn construct_todo(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        let function_reference = &function_call.reference;
+
+        // region: Validation
+
+        // `todo` cannot be preceded (have module path or associated type)
+        if is_preceded(function_reference) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // `todo` can contain AT MOST 1 argument -
+        // string containing the accompanying message
+        if function_call.arguments.len() > 1 {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // check that the argument (if exists) is a string
+        if let Some(argument) = function_call.arguments.first() {
+            if !is_string(argument) {
+                return invalid_compiler_internal_function_call(function_reference);
+            }
+        }
+
+        // endregion
+
+        // region: Construction
+
+        let instructions = vec![
+            // use error code 0 for todo's
+            vm::push(vm::Segment::Constant, 0),
+            vm::call(vm::VMFunctionName::from_literal("Sys.error"), 1),
+        ];
+
+        // endregion
+
+        Ok(instructions)
+    }
+
     // region: Helpers
 
     fn is_module_preceded(function_reference: &ast::JillFunctionReference) -> bool {
@@ -278,6 +323,13 @@ mod compiler_internal_call {
 
     fn is_preceded(function_reference: &ast::JillFunctionReference) -> bool {
         is_module_preceded(function_reference) || is_type_preceded(function_reference)
+    }
+
+    fn is_string(expr: &ast::JillExpression) -> bool {
+        matches!(
+            expr,
+            ast::JillExpression::Literal(ast::JillLiteral::String(_))
+        )
     }
 
     fn invalid_compiler_internal_function_call(
@@ -754,6 +806,52 @@ mod tests {
             "label SKIP_FALSE_0",
         ]
         .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_todo_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // `todo()`
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("todo")),
+        };
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments: vec![],
+        };
+
+        let expected = ["push constant 0", "call Sys.error 1"].join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+
+        // `todo("test message")`
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("todo")),
+        };
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments: vec![ast::JillExpression::Literal(ast::JillLiteral::String(
+                "test message".to_string(),
+            ))],
+        };
+
+        let expected = ["push constant 0", "call Sys.error 1"].join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
