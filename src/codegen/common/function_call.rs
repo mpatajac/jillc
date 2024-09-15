@@ -4,7 +4,10 @@ use strum::VariantNames;
 
 use crate::{
     codegen::{
-        context::{module::VariableContext, ModuleContext, ProgramContext},
+        context::{
+            module::{FunctionContext, VariableContext},
+            ModuleContext, ProgramContext,
+        },
         error::{Error, FallableInstructions},
     },
     common::{ast, CompilerInternalFunction},
@@ -32,8 +35,16 @@ pub fn construct(
             module_context,
             program_context,
         ),
-        FunctionCallKind::Direct => {
-            direct_call::construct(function_call, module_context, program_context)
+        FunctionCallKind::ModuleLocalFunction(function_context) => {
+            module_local_function_call::construct(
+                function_call,
+                function_context,
+                module_context,
+                program_context,
+            )
+        }
+        FunctionCallKind::ModuleForeignFunction => {
+            module_foreign_function_call::construct(function_call, module_context, program_context)
         }
         FunctionCallKind::Invalid => invalid_function_call(function_call),
     }
@@ -49,7 +60,8 @@ fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstr
 enum FunctionCallKind {
     CompilerInternal(CompilerInternalFunction),
     Variable(VariableContext),
-    Direct,
+    ModuleLocalFunction(FunctionContext),
+    ModuleForeignFunction,
     Invalid,
 }
 
@@ -68,35 +80,37 @@ fn determine_function_call_kind(
         return FunctionCallKind::CompilerInternal(compiler_internal_function);
     }
 
+    if function_reference.is_fully_qualified() {
+        // regular, direct call to a function from another module
+        return FunctionCallKind::ModuleForeignFunction;
+    }
+
     // not fully qualified => variable or a module-local function
     // NOTE: this could also be a type-related function,
     // but they are also registered as a module-local function
-    if !function_reference.is_fully_qualified() {
-        // check "variable" case
-        if let Some(variable_context) = module_context.scope.search_variable(function_name) {
-            return FunctionCallKind::Variable(variable_context);
-        }
 
-        // check "function" case
-        // NOTE: if found, let it fall through; otherwise it is invalid
-        // (as it is not a variable nor a module-local function)
-        if module_context
-            .scope
-            // TODO!: figure out naming
-            .search_function(&function_reference.function_name.0)
-            .is_none()
-        {
-            return FunctionCallKind::Invalid;
-        }
-
-        // NOTE: no check for "recursive" case - we cannot detect
-        // tail-recursion at this point, and we cannot perform
-        // the optimization to all recursive calls
+    // check "variable" case
+    if let Some(variable_context) = module_context.scope.search_variable(function_name) {
+        return FunctionCallKind::Variable(variable_context);
     }
 
-    // if no "special" kind of call is detected, then it is a
-    // regular, direct function call
-    FunctionCallKind::Direct
+    // check "module-local function" case
+    // NOTE: split from "module-foreign" functions
+    // so we can use context for name prefix
+    if let Some(function_context) = module_context
+        .scope
+        // TODO!: figure out naming
+        .search_function(&function_reference.function_name.0)
+    {
+        return FunctionCallKind::ModuleLocalFunction(function_context);
+    }
+
+    // not fully qualified AND not found in scope => invalid
+    FunctionCallKind::Invalid
+
+    // NOTE: no check for "recursive" case - we cannot detect
+    // tail-recursion at this point, and we cannot perform
+    // the optimization to all recursive calls
 }
 
 mod compiler_internal_call {
@@ -153,7 +167,22 @@ mod variable_call {
     }
 }
 
-mod direct_call {
+mod module_local_function_call {
+    use crate::codegen::{context::module::FunctionContext, error::FallableInstructions};
+
+    use super::{ast, ModuleContext, ProgramContext};
+
+    pub(super) fn construct(
+        function_call: &ast::JillFunctionCall,
+        function_context: FunctionContext,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        todo!()
+    }
+}
+
+mod module_foreign_function_call {
     use crate::codegen::{
         common::{expression, helpers::function::JillFunctionReferenceExtensions},
         error::FallableInstructions,
@@ -204,7 +233,7 @@ mod tests {
         };
         assert_eq!(
             determine_function_call_kind(&function_reference, &module_context),
-            FunctionCallKind::Direct
+            FunctionCallKind::ModuleForeignFunction
         );
 
         // case 2
@@ -250,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn test_direct_call() {
+    fn test_module_foreign_function_call() {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new(String::from("Test"));
 
