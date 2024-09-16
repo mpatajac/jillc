@@ -8,10 +8,7 @@ pub trait JillFunctionReferenceExtensions {
         module_name: &String,
         function_prefix: String,
     ) -> vm::VMFunctionName;
-    fn from_function_definition(
-        module_name: &String,
-        function_definition: &ast::JillFunction,
-    ) -> Self;
+    fn from_function_definition(function_definition: &ast::JillFunction) -> Self;
 }
 
 impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
@@ -69,12 +66,9 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
         vm::VMFunctionName::construct(&module_path, &type_name, &function_name)
     }
 
-    fn from_function_definition(
-        module_name: &String,
-        function_definition: &ast::JillFunction,
-    ) -> Self {
+    fn from_function_definition(function_definition: &ast::JillFunction) -> Self {
         Self {
-            modules_path: vec![ast::JillIdentifier(module_name.to_string())],
+            modules_path: vec![],
             associated_type: None,
             function_name: function_definition.name.clone(),
         }

@@ -39,8 +39,7 @@ pub fn construct(
         )?;
     }
 
-    let function_reference =
-        ast::JillFunctionReference::from_function_definition(&module_context.module_name, function);
+    let function_reference = ast::JillFunctionReference::from_function_definition(function);
 
     let vm_function_name = function_reference
         .to_fully_qualified_hack_name(&module_context.module_name, function_context.prefix);
