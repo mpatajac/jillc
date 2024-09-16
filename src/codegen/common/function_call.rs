@@ -57,7 +57,7 @@ fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstr
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum FunctionCallKind {
+pub(super) enum FunctionCallKind {
     CompilerInternal(CompilerInternalFunction),
     Variable(VariableContext),
     ModuleLocalFunction(FunctionContext),
@@ -65,7 +65,7 @@ enum FunctionCallKind {
     Invalid,
 }
 
-fn determine_function_call_kind(
+pub(super) fn determine_function_call_kind(
     function_reference: &ast::JillFunctionReference,
     module_context: &ModuleContext,
 ) -> FunctionCallKind {
