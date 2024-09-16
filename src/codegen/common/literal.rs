@@ -1,6 +1,6 @@
 use crate::{
     codegen::{
-        context::{ModuleContext, ProgramContext},
+        context::{module::VariableContext, ModuleContext, ProgramContext},
         error::FallableInstructions,
         vm,
     },
@@ -72,6 +72,11 @@ fn construct_list(
         return Ok(empty_list);
     };
 
+    let temp_index = program_context.temp_segment_index.request();
+    let temp_storage = VariableContext {
+        segment: vm::Segment::Temp,
+        index: temp_index,
+    };
     let instructions = list
         .iter()
         // need to add elements in reverse order
@@ -79,12 +84,12 @@ fn construct_list(
         .map(|elem| {
             Ok([
                 // move last result to temporary storage
-                vec![vm::pop(vm::Segment::Temp, 0)],
+                vec![temp_storage.pop()],
                 // evaluate next elem
                 super::expression::construct(elem, module_context, program_context)?,
                 vec![
                     // re-push previous result (to maintain proper element order)
-                    vm::push(vm::Segment::Temp, 0),
+                    temp_storage.push(),
                     // construct new list "head"
                     vm::call(vm::VMFunctionName::from_literal("List.List"), 2),
                 ],
@@ -93,6 +98,8 @@ fn construct_list(
         })
         .collect::<Result<Vec<Vec<_>>, _>>()?
         .concat();
+
+    program_context.temp_segment_index.release();
 
     Ok([empty_list, instructions].concat())
 }
@@ -210,25 +217,25 @@ mod tests {
 
         let inner_list_1 = vec![
             "call List.Empty 0",
-            "pop temp 0",
+            "pop temp 1",
             "push constant 2",
-            "push temp 0",
+            "push temp 1",
             "call List.List 2",
-            "pop temp 0",
+            "pop temp 1",
             "push constant 5",
-            "push temp 0",
+            "push temp 1",
             "call List.List 2",
         ];
 
         let inner_list_2 = vec![
             "call List.Empty 0",
-            "pop temp 0",
+            "pop temp 1",
             "push constant 3",
-            "push temp 0",
+            "push temp 1",
             "call List.List 2",
-            "pop temp 0",
+            "pop temp 1",
             "push constant 7",
-            "push temp 0",
+            "push temp 1",
             "call List.List 2",
         ];
 
@@ -244,8 +251,7 @@ mod tests {
 
         assert!(
             super::construct_list(&lists, &mut module_context, &mut program_context).is_ok_and(
-                |instructions| vm::VMInstructionBlock::from(dbg!(instructions)).compile()
-                    == expected
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
             )
         );
     }

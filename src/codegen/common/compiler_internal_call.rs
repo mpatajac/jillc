@@ -186,14 +186,15 @@ fn construct_do(
 
     // region: Construction
 
-    // add `pop temp 0` after every call to discard result
+    // add `pop temp {i}` after every call to discard result
+    let temp_index = program_context.temp_segment_index.request();
     let mut instructions = function_call
         .arguments
         .iter()
         .map(|expr| {
             Ok([
                 expression::construct(expr, module_context, program_context)?,
-                vec![vm::pop(vm::Segment::Temp, 0)],
+                vec![vm::pop(vm::Segment::Temp, temp_index)],
             ]
             .concat())
         })
@@ -202,6 +203,8 @@ fn construct_do(
 
     // remove the last `pop` to maintain the last result
     instructions.truncate(instructions.len() - 1);
+
+    program_context.temp_segment_index.release();
 
     // endregion
 
@@ -255,9 +258,10 @@ fn construct_match(
     let tag_fn_name =
         tag_fn_reference.to_fully_qualified_hack_name(&module_context.module_name, String::new());
 
+    let temp_index = program_context.temp_segment_index.request();
     let tag_storage = VariableContext {
         segment: vm::Segment::Temp,
-        index: 0,
+        index: temp_index,
     };
     // call the `_tag` function, store result in temp storage (to enable reuse)
     let object_tag_instructions = [
@@ -265,6 +269,8 @@ fn construct_match(
         vec![vm::call(tag_fn_name, 1), tag_storage.pop()],
     ]
     .concat();
+
+    program_context.temp_segment_index.release();
 
     let variant_count = function_call.arguments.len() - 1;
 

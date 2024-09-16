@@ -1,9 +1,15 @@
 use crate::codegen::{context::module::VariableContext, error::FallableInstructions, vm};
 
+pub struct ArrayBuildConfiguration {
+    pub push_resulting_array: bool,
+    pub array_temp_segment_index: usize,
+    pub array_elem_temp_segment_index: usize,
+}
+
 pub fn build_array_instructions<T, F>(
     array_items: &[T],
     mut item_instructions: F,
-    push_resulting_array: bool,
+    build_configuration: ArrayBuildConfiguration,
 ) -> FallableInstructions
 where
     F: FnMut(&T) -> FallableInstructions,
@@ -14,8 +20,10 @@ where
 
     let array = VariableContext {
         segment: vm::Segment::Temp,
-        // keep `temp 0` for array usage
-        index: 1,
+        // NOTE: have to use different `temp` segment index here
+        // than in array construction because we store array
+        // pointer in `temp` instead of `local`
+        index: build_configuration.array_temp_segment_index,
     };
 
     let array_init_instructions = vec![
@@ -24,6 +32,10 @@ where
         array.pop(),
     ];
 
+    let array_elem_temp_storage = VariableContext {
+        segment: vm::Segment::Temp,
+        index: build_configuration.array_elem_temp_segment_index,
+    };
     let array_items_instructions = array_items
         .iter()
         .enumerate()
@@ -36,9 +48,9 @@ where
                 ],
                 item_instructions(item)?,
                 vec![
-                    vm::pop(vm::Segment::Temp, 0),
+                    array_elem_temp_storage.pop(),
                     vm::pop(vm::Segment::Pointer, 1),
-                    vm::push(vm::Segment::Temp, 0),
+                    array_elem_temp_storage.push(),
                     vm::pop(vm::Segment::That, 0),
                 ],
             ]
@@ -49,7 +61,7 @@ where
 
     let mut instructions = vec![array_init_instructions, array_items_instructions];
 
-    if push_resulting_array {
+    if build_configuration.push_resulting_array {
         instructions.push(vec![array.push()]);
     }
 

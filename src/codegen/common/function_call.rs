@@ -129,18 +129,30 @@ mod variable_call {
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
+        let array_elem_temp_segment_index = program_context.temp_segment_index.request();
+        let array_temp_segment_index = program_context.temp_segment_index.request();
+
+        let array_instructions_build_config = helpers::array::ArrayBuildConfiguration {
+            push_resulting_array: false,
+            array_temp_segment_index,
+            array_elem_temp_segment_index,
+        };
         let arguments_array_instructions = helpers::array::build_array_instructions(
             &function_call.arguments,
             |expr| expression::construct(expr, module_context, program_context),
-            false,
+            array_instructions_build_config,
         )?;
 
         let call_instructions = vec![
             variable_context.push(),
-            // TODO: `request` index from scope
-            vm::push(vm::Segment::Temp, 1),
+            vm::push(vm::Segment::Temp, array_temp_segment_index),
             vm::call(vm::VMFunctionName::from_literal("Fn._call"), 2),
         ];
+
+        // array
+        program_context.temp_segment_index.release();
+        // array elem storage
+        program_context.temp_segment_index.release();
 
         Ok([arguments_array_instructions, call_instructions].concat())
     }

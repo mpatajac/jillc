@@ -19,6 +19,7 @@ pub struct Context {
     pub std_usage_tracker: JillStdUsageTracker,
     pub program_metadata: JillProgramMetadata,
     pub globals: HashSet<ModuleName>,
+    pub temp_segment_index: TempSegmentIndex,
 }
 
 impl Context {
@@ -28,6 +29,7 @@ impl Context {
             std_usage_tracker: JillStdUsageTracker::new(),
             program_metadata: JillProgramMetadata::new(),
             globals: HashSet::new(),
+            temp_segment_index: TempSegmentIndex(0),
         }
     }
 }
@@ -116,6 +118,27 @@ impl JillProgramMetadata {
 }
 
 // endregion
+
+#[derive(Debug)]
+pub struct TempSegmentIndex(usize);
+
+impl TempSegmentIndex {
+    /// Request the first available index for the `temp` segment
+    /// (incrementing the counter in the process for further usage).
+    pub fn request(&mut self) -> usize {
+        let next = self.0 + 1;
+
+        // replace current (free) index with the next one
+        // and return the current (previous) index
+        std::mem::replace(&mut self.0, next)
+    }
+
+    /// Mark the index that was last used as free for further usage
+    /// (by decrementing the internal counter).
+    pub fn release(&mut self) {
+        self.0 -= 1;
+    }
+}
 
 #[cfg(test)]
 mod tests {
