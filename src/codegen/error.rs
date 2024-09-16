@@ -9,6 +9,8 @@ pub enum Error {
     CaptureNotInScope(String),
     InvalidFunctionReference(String),
     MultipleFunctionDefinitions(vm::VMFunctionName),
+    InvalidFunctionCall(String),
+    InvalidCompilerInternalFunctionCall(String),
 }
 
 pub type FallableAction = Result<(), Error>;

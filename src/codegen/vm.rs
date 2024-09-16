@@ -153,6 +153,19 @@ pub fn null() -> VMInstruction {
     VMInstruction::Push(Segment::Constant, 0)
 }
 
+/// Utility function for pushing the `true` value onto the stack.
+pub fn r#true() -> Vec<VMInstruction> {
+    vec![
+        VMInstruction::Push(Segment::Constant, 1),
+        VMInstruction::Command(VMCommand::Neg),
+    ]
+}
+
+/// Utility function for pushing the `false` value onto the stack.
+pub fn r#false() -> VMInstruction {
+    VMInstruction::Push(Segment::Constant, 0)
+}
+
 // endregion
 
 type Index = usize;
