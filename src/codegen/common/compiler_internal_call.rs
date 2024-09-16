@@ -702,4 +702,210 @@ mod tests {
             |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
         ));
     }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_invariants() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // region: if
+
+        let if_preceded = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("if")),
+            },
+            arguments: vec![],
+        };
+
+        let if_invalid_arg_count = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("if")),
+            },
+            arguments: vec![
+                ast::JillExpression::Literal(ast::JillLiteral::Bool(true)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(3)),
+            ],
+        };
+
+        // endregion
+
+        // region: ifElse
+
+        let if_else_preceded = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("ifElse")),
+            },
+            arguments: vec![],
+        };
+
+        let if_else_invalid_arg_count = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("ifElse")),
+            },
+            arguments: vec![
+                ast::JillExpression::Literal(ast::JillLiteral::Bool(true)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(3)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(4)),
+            ],
+        };
+
+        // endregion
+
+        // region: do
+
+        let do_preceded = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("do")),
+            },
+            arguments: vec![],
+        };
+
+        let do_empty = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("do")),
+            },
+            arguments: vec![],
+        };
+
+        let do_non_function_call = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("do")),
+            },
+            arguments: vec![
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(4)),
+            ],
+        };
+
+        // endregion
+
+        // region: match
+
+        let match_not_type_preceded = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("match")),
+            },
+            arguments: vec![],
+        };
+
+        let match_invalid_object_kind = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: Some(ast::JillIdentifier(String::from("Type"))),
+                function_name: ast::JillIdentifier(String::from("match")),
+            },
+            arguments: vec![
+                ast::JillExpression::Literal(ast::JillLiteral::Bool(true)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
+            ],
+        };
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("a"),
+                VariableContextArguments::new(vm::Segment::Static),
+            )
+            .is_ok());
+
+        let match_invalid_arg_count = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: Some(ast::JillIdentifier(String::from("Type"))),
+                function_name: ast::JillIdentifier(String::from("match")),
+            },
+            arguments: vec![
+                ast::JillExpression::VariableName(ast::JillIdentifier(String::from("a"))),
+                ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            ],
+        };
+
+        // endregion
+
+        // region: todo
+
+        let todo_preceded = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("todo")),
+            },
+            arguments: vec![],
+        };
+
+        let todo_too_many_args = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("todo")),
+            },
+            arguments: vec![
+                ast::JillExpression::Literal(ast::JillLiteral::String("test message".to_string())),
+                ast::JillExpression::Literal(ast::JillLiteral::String(
+                    "another message".to_string(),
+                )),
+            ],
+        };
+
+        let todo_invalid_args = ast::JillFunctionCall {
+            reference: ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: None,
+                function_name: ast::JillIdentifier(String::from("todo")),
+            },
+            arguments: vec![ast::JillExpression::Literal(ast::JillLiteral::Integer(3))],
+        };
+
+        // endregion
+
+        let invalid_calls = [
+            // if
+            if_preceded,
+            if_invalid_arg_count,
+            // ifElse
+            if_else_preceded,
+            if_else_invalid_arg_count,
+            // do
+            do_preceded,
+            do_empty,
+            do_non_function_call,
+            // match
+            match_not_type_preceded,
+            match_invalid_object_kind,
+            match_invalid_arg_count,
+            // todo
+            todo_preceded,
+            todo_too_many_args,
+            todo_invalid_args,
+        ];
+
+        let is_invalid_call = |call| {
+            function_call::construct(call, &mut module_context, &mut program_context)
+                .is_err_and(|err| matches!(err, Error::InvalidCompilerInternalFunctionCall(_)))
+        };
+
+        assert!(invalid_calls.iter().all(is_invalid_call));
+    }
 }
