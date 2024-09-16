@@ -13,7 +13,7 @@ use crate::{
     common::{ast, CompilerInternalFunction},
 };
 
-use super::helpers::function::JillFunctionReferenceExtensions;
+use super::{compiler_internal_call, helpers::function::JillFunctionReferenceExtensions};
 
 pub fn construct(
     function_call: &ast::JillFunctionCall,
@@ -111,27 +111,6 @@ fn determine_function_call_kind(
     // NOTE: no check for "recursive" case - we cannot detect
     // tail-recursion at this point, and we cannot perform
     // the optimization to all recursive calls
-}
-
-mod compiler_internal_call {
-    use crate::{
-        codegen::{
-            common::helpers::function::JillFunctionReferenceExtensions,
-            error::{Error, FallableInstructions},
-        },
-        common::CompilerInternalFunction,
-    };
-
-    use super::{ast, ModuleContext, ProgramContext};
-
-    pub(super) fn construct(
-        function_call: &ast::JillFunctionCall,
-        compiler_internal_function: CompilerInternalFunction,
-        module_context: &mut ModuleContext,
-        program_context: &mut ProgramContext,
-    ) -> FallableInstructions {
-        todo!()
-    }
 }
 
 mod variable_call {

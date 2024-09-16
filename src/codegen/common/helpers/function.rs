@@ -8,7 +8,6 @@ pub trait JillFunctionReferenceExtensions {
         module_name: &String,
         function_prefix: String,
     ) -> vm::VMFunctionName;
-    fn is_compiler_internal_edge_case(&self) -> bool;
 }
 
 impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
@@ -64,31 +63,6 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
         };
 
         vm::VMFunctionName::construct(&module_path, &type_name, &function_name)
-    }
-
-    fn is_compiler_internal_edge_case(&self) -> bool {
-        fn match_not_associated_with_a_type(
-            function_reference: &ast::JillFunctionReference,
-        ) -> bool {
-            &function_reference.function_name.0 == "match"
-                && function_reference.associated_type.is_none()
-        }
-
-        fn free_internals_are_preceded(
-            function_reference: &ast::JillFunctionReference,
-            free_internals: &[&str],
-        ) -> bool {
-            free_internals.contains(&function_reference.function_name.0.as_str())
-                && (!function_reference.modules_path.is_empty()
-                    || function_reference.associated_type.is_some())
-        }
-
-        let edge_cases = [
-            match_not_associated_with_a_type(self),
-            free_internals_are_preceded(self, &["if", "ifElse", "do", "todo"]),
-        ];
-
-        edge_cases.iter().any(|&b| b)
     }
 }
 
