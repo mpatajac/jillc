@@ -117,6 +117,7 @@ mod compiler_internal_call {
     use crate::{
         codegen::{
             common::{expression, helpers::function::JillFunctionReferenceExtensions},
+            context::module::VariableContext,
             error::{Error, FallableInstructions},
             vm,
         },
@@ -141,7 +142,9 @@ mod compiler_internal_call {
             CompilerInternalFunction::Do => {
                 construct_do(function_call, module_context, program_context)
             }
-            CompilerInternalFunction::Match => todo!(),
+            CompilerInternalFunction::Match => {
+                construct_match(function_call, module_context, program_context)
+            }
             CompilerInternalFunction::Todo => {
                 construct_todo(function_call, module_context, program_context)
             }
@@ -323,6 +326,118 @@ mod compiler_internal_call {
         Ok(instructions)
     }
 
+    fn construct_match(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        let function_reference = &function_call.reference;
+
+        // region: Validation
+
+        // `match` MUST be type-preceded (it CAN have module path, but it is not required)
+        if !is_type_preceded(function_reference) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // `match` MUST contain AT LEAST 3 expressions -
+        // one representing the object whose variant (tag) will be checked
+        // and 2 or more expressions to be evaluated based on the object's variant
+        // (no point in "checking" only one variant)
+        if function_call.arguments.len() < 3 {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // object (instance of custom type) can only be present
+        // as a variable or a result of a function call
+        let object = function_call
+            .arguments
+            .first()
+            .expect("should have (more than) one argument");
+
+        if !can_be_object(object) {
+            return invalid_compiler_internal_function_call(function_reference);
+        }
+
+        // endregion
+
+        // region: Construction
+
+        let tag_fn_reference = ast::JillFunctionReference {
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("_tag")),
+            modules_path: function_reference.modules_path.clone(),
+        };
+        // TODO: figure out naming
+        // `_tag` is a top-level function, so it is not nested (no need for prefix)
+        let tag_fn_name = tag_fn_reference
+            .to_fully_qualified_hack_name(&module_context.module_name, String::new());
+
+        let tag_storage = VariableContext {
+            segment: vm::Segment::Temp,
+            index: 0,
+        };
+        // call the `_tag` function, store result in temp storage (to enable reuse)
+        let object_tag_instructions = [
+            expression::construct(object, module_context, program_context)?,
+            vec![vm::call(tag_fn_name, 1), tag_storage.pop()],
+        ]
+        .concat();
+
+        let variant_count = function_call.arguments.len() - 1;
+
+        let variant_labels = (0..variant_count)
+            .map(|i| module_context.scope.create_label(&format!("VARIANT_{i}")))
+            .collect::<Vec<_>>();
+
+        // create checks for all but last variant
+        // (if it is not the first n-1, then it must be the last one)
+        let variant_check_instructions = (0..variant_count - 1)
+            .map(|i| {
+                [
+                    // if tag equals current variant, go to corresponding expression
+                    tag_storage.push(),
+                    vm::push(vm::Segment::Constant, i),
+                    vm::command(vm::VMCommand::Eq),
+                    vm::label(vm::LabelAction::IfGoto, &variant_labels[i]),
+                ]
+            })
+            .collect::<Vec<_>>()
+            .concat();
+
+        let variant_expr_instructions = function_call
+            .arguments
+            .iter()
+            // skip match object
+            .skip(1)
+            // join with corresponding label
+            .zip(variant_labels.iter())
+            // variant evaluations are listed in reverse order
+            .rev()
+            .map(|(expr, label)| {
+                Ok([
+                    // jump label, followed by variant expression
+                    vec![vm::label(vm::LabelAction::Label, label)],
+                    expression::construct(expr, module_context, program_context)?,
+                ]
+                .concat())
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .concat();
+
+        // endregion
+
+        let end_label = module_context.scope.create_label("MATCH_END");
+        let instructions = [
+            object_tag_instructions,
+            variant_check_instructions,
+            variant_expr_instructions,
+            vec![vm::label(vm::LabelAction::Label, end_label)],
+        ];
+
+        Ok(instructions.concat())
+    }
+
     fn construct_todo(
         function_call: &ast::JillFunctionCall,
         module_context: &mut ModuleContext,
@@ -387,6 +502,15 @@ mod compiler_internal_call {
         matches!(
             expr,
             ast::JillExpression::Literal(ast::JillLiteral::String(_))
+        )
+    }
+
+    fn can_be_object(expr: &ast::JillExpression) -> bool {
+        // object (instance of custom type) can only be present
+        // as a variable or a result of a function call
+        matches!(
+            expr,
+            ast::JillExpression::VariableName(_) | ast::JillExpression::FunctionCall(_)
         )
     }
 
@@ -912,6 +1036,77 @@ mod tests {
         };
 
         let expected = ["call One.thing 0", "pop temp 0", "call Other.action 0"].join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_match_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // `Option::Option:match(o, 0, Option::Some:value(o))`
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("o"),
+                VariableContextArguments::new(vm::Segment::Local),
+            )
+            .is_ok());
+
+        let call_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Option"))],
+            associated_type: Some(ast::JillIdentifier(String::from("Some"))),
+            function_name: ast::JillIdentifier(String::from("value")),
+        };
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Option"))],
+            associated_type: Some(ast::JillIdentifier(String::from("Option"))),
+            function_name: ast::JillIdentifier(String::from("match")),
+        };
+
+        let arguments = vec![
+            ast::JillExpression::VariableName(ast::JillIdentifier(String::from("o"))),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(0)),
+            ast::JillExpression::FunctionCall(ast::JillFunctionCall {
+                reference: call_reference,
+                arguments: vec![ast::JillExpression::VariableName(ast::JillIdentifier(
+                    String::from("o"),
+                ))],
+            }),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            // tag
+            "push local 0",
+            "call Option._tag 1",
+            "pop temp 0",
+            // variant checks
+            "push temp 0",
+            "push constant 0",
+            "eq",
+            "if-goto VARIANT_0_0",
+            // variant 1
+            "label VARIANT_1_0",
+            "push local 0",
+            "call Option.Some_value 1",
+            // variant 0
+            "label VARIANT_0_0",
+            "push constant 0",
+            // end
+            "label MATCH_END_0",
+        ]
+        .join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
