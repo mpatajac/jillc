@@ -1,6 +1,6 @@
 use crate::{
     codegen::{
-        common::helpers::function::JillFunctionReferenceExtensions,
+        common::{expression, helpers::function::JillFunctionReferenceExtensions, variable},
         context::{
             module::{FunctionContextArguments, VariableContextArguments},
             ModuleContext, ProgramContext,
@@ -61,8 +61,12 @@ pub fn construct(
 
     let number_of_local_variables = function.body.local_variables.len();
 
-    let function_body_instructions =
-        construct_body(&function.body, module_context, program_context)?;
+    let function_body_instructions = construct_body(
+        &function.body,
+        &function.name.0,
+        module_context,
+        program_context,
+    )?;
 
     module_context.scope.leave_function();
 
@@ -76,11 +80,56 @@ pub fn construct(
 
 fn construct_body(
     function_body: &ast::JillFunctionBody,
+    function_name: &str,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
-    // TODO: check is tail-recursive
-    todo!()
+    let is_tail_recursive = tail_recursion::is_tail_recursive(
+        function_name,
+        &function_body.return_expression,
+        module_context,
+    );
+
+    let function_start_label = if is_tail_recursive {
+        vec![vm::label(
+            vm::LabelAction::Label,
+            module_context.scope.create_label("REC_CALL"),
+        )]
+    } else {
+        Vec::new()
+    };
+
+    let local_variables_instructions = function_body
+        .local_variables
+        .iter()
+        .map(|var| variable::construct(var, vm::Segment::Local, module_context, program_context))
+        .collect::<Result<Vec<_>, _>>()?
+        .concat();
+
+    let return_instructions = if is_tail_recursive {
+        // in case of a tail-recursive call, simulate function call by
+        // resetting the function arguments and jumping to the start of the function
+        tail_recursion::construct_tail_recursive_call(
+            function_name,
+            &function_body.return_expression,
+            module_context,
+        )
+    } else {
+        // otherwise just evaluate the return expression
+        expression::construct(
+            &function_body.return_expression,
+            module_context,
+            program_context,
+        )
+    }?;
+
+    Ok([
+        function_start_label,
+        local_variables_instructions,
+        return_instructions,
+        vec![vm::vm_return()],
+    ]
+    .concat())
 }
 
 mod tail_recursion {
@@ -88,6 +137,7 @@ mod tail_recursion {
         codegen::{
             common::function_call::{self, FunctionCallKind},
             context::ModuleContext,
+            error::FallableInstructions,
         },
         common::{ast, CompilerInternalFunction},
     };
@@ -139,6 +189,14 @@ mod tail_recursion {
             // cannot have a nested recursive call
             Cif::Todo => false,
         }
+    }
+
+    pub(super) fn construct_tail_recursive_call(
+        original_function_name: &str,
+        return_expression: &ast::JillExpression,
+        module_context: &mut ModuleContext,
+    ) -> FallableInstructions {
+        todo!()
     }
 }
 
@@ -256,5 +314,191 @@ mod tests {
         assert!(tail_recursion_tests
             .iter()
             .all(|(expr, expected)| run_test(expr) == *expected));
+    }
+
+    #[test]
+    fn test_simple_function() {
+        use ast::*;
+
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        // fn g x = Math::add(x, 2).
+        let function = JillFunction {
+            name: JillIdentifier("g".to_owned()),
+            arguments: vec![JillIdentifier("x".to_string())],
+            captures: vec![],
+            body: JillFunctionBody {
+                local_functions: vec![],
+                local_variables: vec![],
+                return_expression: JillExpression::FunctionCall(JillFunctionCall {
+                    reference: JillFunctionReference {
+                        modules_path: vec![JillIdentifier("Math".to_string())],
+                        associated_type: None,
+                        function_name: JillIdentifier("add".to_owned()),
+                    },
+                    arguments: vec![
+                        JillExpression::VariableName(JillIdentifier("x".to_string())),
+                        JillExpression::Literal(JillLiteral::Integer(2)),
+                    ],
+                }),
+            },
+        };
+
+        let expected = [
+            "function Test.g 0",
+            "push argument 0",
+            "push constant 2",
+            "call Math.add 2",
+            "return",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_compound_function() {
+        use ast::*;
+
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        /*
+           fn foo a b =
+               fn bar x = Bool::gt(x, 2).
+
+               let c = Math::mult(a, b),
+               let d = Math::sub(c, 6),
+
+               ifElse(bar(d), 1, -1).
+        */
+        let function = JillFunction {
+            name: JillIdentifier("foo".to_owned()),
+            arguments: vec![
+                JillIdentifier("a".to_owned()),
+                JillIdentifier("b".to_owned()),
+            ],
+            captures: vec![],
+            body: JillFunctionBody {
+                local_functions: vec![JillFunction {
+                    name: JillIdentifier("bar".to_owned()),
+                    arguments: vec![JillIdentifier("x".to_owned())],
+                    captures: vec![],
+                    body: JillFunctionBody {
+                        local_functions: vec![],
+                        local_variables: vec![],
+                        return_expression: JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![JillIdentifier("Bool".to_owned())],
+                                associated_type: None,
+                                function_name: JillIdentifier("gt".to_owned()),
+                            },
+                            arguments: vec![
+                                JillExpression::VariableName(JillIdentifier("x".to_owned())),
+                                JillExpression::Literal(JillLiteral::Integer(2)),
+                            ],
+                        }),
+                    },
+                }],
+                local_variables: vec![
+                    JillVariable {
+                        name: JillIdentifier("c".to_owned()),
+                        value: JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![JillIdentifier("Math".to_owned())],
+                                associated_type: None,
+                                function_name: JillIdentifier("mult".to_owned()),
+                            },
+                            arguments: vec![
+                                JillExpression::VariableName(JillIdentifier("a".to_owned())),
+                                JillExpression::VariableName(JillIdentifier("b".to_owned())),
+                            ],
+                        }),
+                    },
+                    JillVariable {
+                        name: JillIdentifier("d".to_owned()),
+                        value: JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![JillIdentifier("Math".to_owned())],
+                                associated_type: None,
+                                function_name: JillIdentifier("sub".to_owned()),
+                            },
+                            arguments: vec![
+                                JillExpression::VariableName(JillIdentifier("c".to_owned())),
+                                JillExpression::Literal(JillLiteral::Integer(6)),
+                            ],
+                        }),
+                    },
+                ],
+                return_expression: JillExpression::FunctionCall(JillFunctionCall {
+                    reference: JillFunctionReference {
+                        modules_path: vec![],
+                        associated_type: None,
+                        function_name: JillIdentifier("ifElse".to_owned()),
+                    },
+                    arguments: vec![
+                        JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![],
+                                associated_type: None,
+                                function_name: JillIdentifier("bar".to_owned()),
+                            },
+                            arguments: vec![JillExpression::VariableName(JillIdentifier(
+                                "d".to_owned(),
+                            ))],
+                        }),
+                        JillExpression::Literal(JillLiteral::Integer(1)),
+                        JillExpression::Literal(JillLiteral::Integer(-1)),
+                    ],
+                }),
+            },
+        };
+
+        let expected = [
+            // nested function
+            "function Test.foo_bar 0",
+            "push argument 0",
+            "push constant 2",
+            "call Bool.gt 2",
+            "return",
+            // main function
+            "function Test.foo 2",
+            // let c = Math::mult(a, b)
+            "push argument 0",
+            "push argument 1",
+            "call Math.mult 2",
+            "pop local 0",
+            // let d = Math::sub(c, 6)
+            "push local 0",
+            "push constant 6",
+            "call Math.sub 2",
+            "pop local 1",
+            // ifElse(bar(d), 1, -1)
+            "push local 1",
+            "call Test.foo_bar 1",
+            "push constant 0",
+            "eq",
+            "if-goto SKIP_TRUE_0",
+            "push constant 1",
+            "goto SKIP_FALSE_0",
+            "label SKIP_TRUE_0",
+            "push constant 1",
+            "neg",
+            "label SKIP_FALSE_0",
+            "return",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
     }
 }
