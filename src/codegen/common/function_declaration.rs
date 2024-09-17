@@ -5,7 +5,7 @@ use crate::{
             module::{FunctionContextArguments, VariableContextArguments},
             ModuleContext, ProgramContext,
         },
-        error::FallableInstructions,
+        error::{Error, FallableInstructions},
         vm,
     },
     common::ast,
@@ -22,7 +22,17 @@ pub fn construct(
         .captures
         .iter()
         .map(|capture| capture.0.clone())
-        .collect();
+        .collect::<Vec<_>>();
+
+    // check that all captures are existing variables in scope
+    // NOTE: since we search for variables in the parent function's scope,
+    // we need to perform this check before we add the function to scope.
+    if let Some(capture) = capture_names
+        .iter()
+        .find(|capture| module_context.scope.search_variable(capture).is_none())
+    {
+        return Err(Error::CaptureNotInScope(capture.to_string()));
+    }
 
     // register function in scope
     let function_context = module_context.scope.enter_function(
