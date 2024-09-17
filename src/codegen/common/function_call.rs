@@ -20,6 +20,22 @@ pub fn construct(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
+    // general case (e.g. normal expressions) where
+    // we don't have to worry about tail-recursion
+    construct_with_custom_call_construction(
+        function_call,
+        direct_call::NormalCallConstruction,
+        module_context,
+        program_context,
+    )
+}
+
+pub fn construct_with_custom_call_construction(
+    function_call: &ast::JillFunctionCall,
+    call_construction: impl direct_call::CallConstruction,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) -> FallableInstructions {
     match determine_function_call_kind(&function_call.reference, module_context) {
         FunctionCallKind::CompilerInternal(compiler_internal_function) => {
             compiler_internal_call::construct(
@@ -39,13 +55,17 @@ pub fn construct(
             direct_call::construct_module_local(
                 function_call,
                 function_context,
+                call_construction,
                 module_context,
                 program_context,
             )
         }
-        FunctionCallKind::ModuleForeignFunction => {
-            direct_call::construct_module_foreign(function_call, module_context, program_context)
-        }
+        FunctionCallKind::ModuleForeignFunction => direct_call::construct_module_foreign(
+            function_call,
+            call_construction,
+            module_context,
+            program_context,
+        ),
         FunctionCallKind::Invalid => invalid_function_call(function_call),
     }
 }
@@ -158,7 +178,7 @@ mod variable_call {
     }
 }
 
-mod direct_call {
+pub(super) mod direct_call {
     use crate::codegen::{
         common::{expression, helpers::function::JillFunctionReferenceExtensions},
         context::module::FunctionContext,
@@ -168,8 +188,9 @@ mod direct_call {
 
     use super::{ast, invalid_function_call, ModuleContext, ProgramContext};
 
-    pub(super) fn construct_module_foreign(
+    pub fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
+        call_construction: impl CallConstruction,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -183,12 +204,19 @@ mod direct_call {
             return invalid_function_call(function_call);
         }
 
-        construct(function_call, None, module_context, program_context)
+        construct(
+            function_call,
+            None,
+            call_construction,
+            module_context,
+            program_context,
+        )
     }
 
-    pub(super) fn construct_module_local(
+    pub fn construct_module_local(
         function_call: &ast::JillFunctionCall,
         function_context: FunctionContext,
+        call_construction: impl CallConstruction,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -200,20 +228,49 @@ mod direct_call {
         construct(
             function_call,
             Some(local_call_info),
+            call_construction,
             module_context,
             program_context,
         )
     }
 
     #[derive(Debug, Default, Clone)]
-    struct LocalCallInfo {
+    pub struct LocalCallInfo {
         module_name: String,
         prefix: String,
+    }
+
+    pub trait CallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            local_call_info: Option<LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction>;
+    }
+
+    pub struct NormalCallConstruction;
+
+    impl CallConstruction for NormalCallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            local_call_info: Option<LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction> {
+            vec![vm::call(
+                // TODO!: figure out naming
+                function_call.reference.to_fully_qualified_hack_name(
+                    &local_call_info.clone().unwrap_or_default().module_name,
+                    local_call_info.unwrap_or_default().prefix,
+                ),
+                function_call.arguments.len(),
+            )]
+        }
     }
 
     fn construct(
         function_call: &ast::JillFunctionCall,
         local_call_info: Option<LocalCallInfo>,
+        call_construction: impl CallConstruction,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -224,14 +281,7 @@ mod direct_call {
             .collect::<Result<Vec<_>, _>>()?
             .concat();
 
-        let call = vec![vm::call(
-            // TODO!: figure out naming
-            function_call.reference.to_fully_qualified_hack_name(
-                &local_call_info.clone().unwrap_or_default().module_name,
-                local_call_info.unwrap_or_default().prefix,
-            ),
-            function_call.arguments.len(),
-        )];
+        let call = call_construction.construct(function_call, local_call_info);
 
         Ok([argument_instructions, call].concat())
     }
