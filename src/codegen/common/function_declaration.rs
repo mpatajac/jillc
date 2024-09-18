@@ -99,10 +99,11 @@ fn construct_body(
         module_context,
     );
 
-    let function_start_label = if is_tail_recursive {
+    let function_start_label = module_context.scope.create_label("REC_CALL");
+    let function_start_label_instructions = if is_tail_recursive {
         vec![vm::label(
             vm::LabelAction::Label,
-            module_context.scope.create_label("REC_CALL"),
+            function_start_label.clone(),
         )]
     } else {
         Vec::new()
@@ -116,12 +117,18 @@ fn construct_body(
         .concat();
 
     let return_instructions = if is_tail_recursive {
-        // in case of a tail-recursive call, simulate function call by
-        // resetting the function arguments and jumping to the start of the function
+        let ast::JillExpression::FunctionCall(ref function_call) = function_body.return_expression
+        else {
+            unreachable!("is tail recursive => return expression is a function call");
+        };
+
+        // in case of a tail-recursive call, perform optimized call
         tail_recursion::construct_tail_recursive_call(
-            function_name,
-            &function_body.return_expression,
+            function_name.to_owned(),
+            function_call,
+            function_start_label,
             module_context,
+            program_context,
         )
     } else {
         // otherwise just evaluate the return expression
@@ -133,7 +140,7 @@ fn construct_body(
     }?;
 
     Ok([
-        function_start_label,
+        function_start_label_instructions,
         local_variables_instructions,
         return_instructions,
         vec![vm::vm_return()],
@@ -144,9 +151,14 @@ fn construct_body(
 mod tail_recursion {
     use crate::{
         codegen::{
-            common::function_call::{self, FunctionCallKind},
-            context::ModuleContext,
+            common::{
+                expression,
+                function_call::{self, direct_call, FunctionCallKind},
+                helpers::function::JillFunctionReferenceExtensions,
+            },
+            context::{ModuleContext, ProgramContext},
             error::FallableInstructions,
+            vm,
         },
         common::{ast, CompilerInternalFunction},
     };
@@ -200,12 +212,60 @@ mod tail_recursion {
         }
     }
 
+    struct RecursiveCallConstruction {
+        original_function_name: String,
+        function_start_label: String,
+    }
+
+    impl function_call::direct_call::CallConstruction for RecursiveCallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            local_call_info: Option<direct_call::LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction> {
+            let function_reference = &function_call.reference;
+
+            // check if this call is THE recursive call
+            if !function_reference.is_fully_qualified()
+                && function_reference.associated_type.is_none()
+                && function_reference.function_name.0 == self.original_function_name
+            {
+                // reset the function arguments and jump to the start of the function
+                let argument_reset_instructions = (0..function_call.arguments.len())
+                    .map(|i| vm::pop(vm::Segment::Argument, i))
+                    .collect();
+
+                [
+                    argument_reset_instructions,
+                    vec![vm::label(vm::LabelAction::Goto, self.function_start_label)],
+                ]
+                .concat()
+            } else {
+                // not a recursive call => perform normal function call construction
+                function_call::direct_call::NormalCallConstruction
+                    .construct(function_call, local_call_info)
+            }
+        }
+    }
+
     pub(super) fn construct_tail_recursive_call(
-        original_function_name: &str,
-        return_expression: &ast::JillExpression,
+        original_function_name: String,
+        function_call: &ast::JillFunctionCall,
+        function_start_label: String,
         module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
     ) -> FallableInstructions {
-        todo!()
+        let recursive_call_construction = RecursiveCallConstruction {
+            original_function_name,
+            function_start_label,
+        };
+
+        function_call::construct_with_custom_call_construction(
+            function_call,
+            recursive_call_construction,
+            module_context,
+            program_context,
+        )
     }
 }
 
@@ -499,6 +559,113 @@ mod tests {
             "label SKIP_TRUE_0",
             "push constant 1",
             "neg",
+            "label SKIP_FALSE_0",
+            "return",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_shallow_tail_recursion() {
+        use ast::*;
+
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new("Test".to_owned());
+
+        /*
+            fn _choosePosition startingPosition =
+                do(
+                    Sys::wait(100),
+                    Game::clearPositionHighlight(5),
+                    ifElse(True, 5, _choosePosition(5))
+                ).
+
+        */
+        let function = JillFunction {
+            name: JillIdentifier("_choosePosition".to_owned()),
+            arguments: vec![JillIdentifier("startingPosition".to_owned())],
+            captures: vec![],
+            body: JillFunctionBody {
+                local_functions: vec![],
+                local_variables: vec![],
+                return_expression: JillExpression::FunctionCall(JillFunctionCall {
+                    reference: JillFunctionReference {
+                        modules_path: vec![],
+                        associated_type: None,
+                        function_name: JillIdentifier("do".to_owned()),
+                    },
+                    arguments: vec![
+                        JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![JillIdentifier("Sys".to_owned())],
+                                associated_type: None,
+                                function_name: JillIdentifier("wait".to_owned()),
+                            },
+                            arguments: vec![JillExpression::Literal(JillLiteral::Integer(100))],
+                        }),
+                        JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![JillIdentifier("Game".to_owned())],
+                                associated_type: None,
+                                function_name: JillIdentifier("clearPositionHighlight".to_owned()),
+                            },
+                            arguments: vec![JillExpression::Literal(JillLiteral::Integer(5))],
+                        }),
+                        JillExpression::FunctionCall(JillFunctionCall {
+                            reference: JillFunctionReference {
+                                modules_path: vec![],
+                                associated_type: None,
+                                function_name: JillIdentifier("ifElse".to_owned()),
+                            },
+                            arguments: vec![
+                                JillExpression::Literal(JillLiteral::Bool(true)),
+                                JillExpression::Literal(JillLiteral::Integer(5)),
+                                JillExpression::FunctionCall(JillFunctionCall {
+                                    reference: JillFunctionReference {
+                                        modules_path: vec![],
+                                        associated_type: None,
+                                        function_name: JillIdentifier("_choosePosition".to_owned()),
+                                    },
+                                    arguments: vec![JillExpression::Literal(JillLiteral::Integer(
+                                        5,
+                                    ))],
+                                }),
+                            ],
+                        }),
+                    ],
+                }),
+            },
+        };
+
+        let expected = [
+            "function Test._choosePosition 0",
+            "label REC_CALL_0",
+            // Sys::wait(100)
+            "push constant 100",
+            "call Sys.wait 1",
+            "pop temp 0",
+            // Game::clearPositionHighlight(5)
+            "push constant 5",
+            "call Game.clearPositionHighlight 1",
+            "pop temp 0",
+            // ifElse(True, 5, _choosePosition(5))
+            "push constant 1",
+            "neg",
+            "push constant 0",
+            "eq",
+            "if-goto SKIP_TRUE_0",
+            "push constant 5",
+            "goto SKIP_FALSE_0",
+            "label SKIP_TRUE_0",
+            "push constant 5",
+            "pop argument 0",
+            "goto REC_CALL_0",
             "label SKIP_FALSE_0",
             "return",
         ]
