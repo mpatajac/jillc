@@ -94,8 +94,8 @@ fn construct_body(
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
     let is_tail_recursive = tail_recursion::is_tail_recursive(
-        function_name,
         &function_body.return_expression,
+        function_name,
         module_context,
     );
 
@@ -144,7 +144,10 @@ fn construct_body(
 mod tail_recursion {
     use crate::{
         codegen::{
-            common::function_call::{self, FunctionCallKind},
+            common::{
+                function_call::{self, FunctionCallKind},
+                helpers::function::JillFunctionReferenceExtensions,
+            },
             context::ModuleContext,
             error::FallableInstructions,
         },
@@ -155,8 +158,8 @@ mod tail_recursion {
     type Cif = CompilerInternalFunction;
 
     pub(super) fn is_tail_recursive(
-        original_function_name: &str,
         return_expression: &ast::JillExpression,
+        original_function_name: &str,
         module_context: &mut ModuleContext,
     ) -> bool {
         // has to be a function call
@@ -165,7 +168,7 @@ mod tail_recursion {
         };
 
         // direct recursive call
-        if function_call.reference.function_name.0 == original_function_name {
+        if has_original_name(&function_call.reference, original_function_name) {
             return true;
         }
 
@@ -185,7 +188,7 @@ mod tail_recursion {
                     return false;
                 };
 
-                is_tail_recursive(original_function_name, last_argument, module_context)
+                is_tail_recursive(last_argument, original_function_name, module_context)
             }
 
             // check that any variant expression is a nested recursive call
@@ -193,7 +196,7 @@ mod tail_recursion {
                 .arguments
                 .iter()
                 .skip(1)
-                .any(|expr| is_tail_recursive(original_function_name, expr, module_context)),
+                .any(|expr| is_tail_recursive(expr, original_function_name, module_context)),
 
             // cannot have a nested recursive call
             Cif::Todo => false,
@@ -206,6 +209,15 @@ mod tail_recursion {
         module_context: &mut ModuleContext,
     ) -> FallableInstructions {
         todo!()
+    }
+
+    fn has_original_name(
+        function_reference: &ast::JillFunctionReference,
+        original_function_name: &str,
+    ) -> bool {
+        !function_reference.is_fully_qualified()
+            && function_reference.associated_type.is_none()
+            && function_reference.function_name.0 == original_function_name
     }
 }
 
