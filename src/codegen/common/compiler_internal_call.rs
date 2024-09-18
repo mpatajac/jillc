@@ -8,25 +8,76 @@ use crate::{
     common::{ast, CompilerInternalFunction},
 };
 
+pub trait ArgumentConstruction: Clone {
+    fn construct(
+        self,
+        expression: &ast::JillExpression,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions;
+}
+
+#[derive(Debug, Clone)]
+struct NormalArgumentConstruction;
+
+impl ArgumentConstruction for NormalArgumentConstruction {
+    fn construct(
+        self,
+        expression: &ast::JillExpression,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        expression::construct(expression, module_context, program_context)
+    }
+}
+
 pub(super) fn construct(
     function_call: &ast::JillFunctionCall,
     compiler_internal_function: CompilerInternalFunction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
+    construct_with_custom_argument_construction(
+        function_call,
+        compiler_internal_function,
+        NormalArgumentConstruction,
+        module_context,
+        program_context,
+    )
+}
+
+pub(super) fn construct_with_custom_argument_construction(
+    function_call: &ast::JillFunctionCall,
+    compiler_internal_function: CompilerInternalFunction,
+    argument_construction: impl ArgumentConstruction,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) -> FallableInstructions {
     match compiler_internal_function {
-        CompilerInternalFunction::If => {
-            construct_if(function_call, module_context, program_context)
-        }
-        CompilerInternalFunction::IfElse => {
-            construct_if_else(function_call, module_context, program_context)
-        }
-        CompilerInternalFunction::Do => {
-            construct_do(function_call, module_context, program_context)
-        }
-        CompilerInternalFunction::Match => {
-            construct_match(function_call, module_context, program_context)
-        }
+        CompilerInternalFunction::If => construct_if(
+            function_call,
+            argument_construction,
+            module_context,
+            program_context,
+        ),
+        CompilerInternalFunction::IfElse => construct_if_else(
+            function_call,
+            argument_construction,
+            module_context,
+            program_context,
+        ),
+        CompilerInternalFunction::Do => construct_do(
+            function_call,
+            argument_construction,
+            module_context,
+            program_context,
+        ),
+        CompilerInternalFunction::Match => construct_match(
+            function_call,
+            argument_construction,
+            module_context,
+            program_context,
+        ),
         CompilerInternalFunction::Todo => {
             construct_todo(function_call, module_context, program_context)
         }
@@ -35,6 +86,7 @@ pub(super) fn construct(
 
 fn construct_if(
     function_call: &ast::JillFunctionCall,
+    argument_construction: impl ArgumentConstruction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -77,7 +129,7 @@ fn construct_if(
     // condition check -> action -> label to skip to if condition not satisfied
     let instructions = [
         condition_instructions,
-        expression::construct(action, module_context, program_context)?,
+        argument_construction.construct(action, module_context, program_context)?,
         vec![vm::label(vm::LabelAction::Label, skip_if_label)],
     ];
 
@@ -88,6 +140,7 @@ fn construct_if(
 
 fn construct_if_else(
     function_call: &ast::JillFunctionCall,
+    argument_construction: impl ArgumentConstruction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -140,7 +193,7 @@ fn construct_if_else(
     // point to skip "true" to, evaluate "false" expression, point to skip "false" to
     let false_instructions = [
         vec![vm::label(vm::LabelAction::Label, skip_true_label)],
-        expression::construct(false_expression, module_context, program_context)?,
+        argument_construction.construct(false_expression, module_context, program_context)?,
         vec![vm::label(vm::LabelAction::Label, skip_false_label)],
     ]
     .concat();
@@ -159,6 +212,7 @@ fn construct_if_else(
 
 fn construct_do(
     function_call: &ast::JillFunctionCall,
+    argument_construction: impl ArgumentConstruction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -171,9 +225,9 @@ fn construct_do(
         return invalid_compiler_internal_function_call(function_reference);
     }
 
-    // `do` MUST contain AT LEAST 1 argument -
+    // `do` MUST contain AT LEAST 2 arguments -
     // function calls to perform (and discard)
-    if function_call.arguments.is_empty() {
+    if function_call.arguments.len() < 2 {
         return invalid_compiler_internal_function_call(function_reference);
     }
 
@@ -186,11 +240,14 @@ fn construct_do(
 
     // region: Construction
 
-    // add `pop temp {i}` after every call to discard result
+    // add `pop temp {i}` after every call (except last) to discard result
     let temp_index = program_context.temp_segment_index.request();
-    let mut instructions = function_call
+    let argument_count = function_call.arguments.len();
+
+    let dropped_arguments_instructions = function_call
         .arguments
         .iter()
+        .take(argument_count - 1)
         .map(|expr| {
             Ok([
                 expression::construct(expr, module_context, program_context)?,
@@ -201,8 +258,16 @@ fn construct_do(
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
-    // remove the last `pop` to maintain the last result
-    instructions.truncate(instructions.len() - 1);
+    // last argument (outcome) is not dropped
+    let last_argument = function_call
+        .arguments
+        .last()
+        .expect("`do` should have (more than) one argument");
+
+    let last_argument_instructions =
+        argument_construction.construct(last_argument, module_context, program_context)?;
+
+    let instructions = [dropped_arguments_instructions, last_argument_instructions].concat();
 
     program_context.temp_segment_index.release();
 
@@ -213,6 +278,7 @@ fn construct_do(
 
 fn construct_match(
     function_call: &ast::JillFunctionCall,
+    argument_construction: impl ArgumentConstruction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -306,7 +372,9 @@ fn construct_match(
             Ok([
                 // jump label, followed by variant expression
                 vec![vm::label(vm::LabelAction::Label, label)],
-                expression::construct(expr, module_context, program_context)?,
+                argument_construction
+                    .clone()
+                    .construct(expr, module_context, program_context)?,
             ]
             .concat())
         })
