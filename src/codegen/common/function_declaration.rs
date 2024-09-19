@@ -461,7 +461,7 @@ mod tests {
             "function Test.g 0",
             "push argument 0",
             "push constant 2",
-            "call Math.add 2",
+            "add",
             "return",
         ]
         .join("\n");
@@ -577,19 +577,19 @@ mod tests {
             "function Test.foo_bar 0",
             "push argument 0",
             "push constant 2",
-            "call Bool.gt 2",
+            "gt",
             "return",
             // main function
             "function Test.foo 2",
             // let c = Math::mult(a, b)
             "push argument 0",
             "push argument 1",
-            "call Math.mult 2",
+            "call Math.multiply 2",
             "pop local 0",
             // let d = Math::sub(c, 6)
             "push local 0",
             "push constant 6",
-            "call Math.sub 2",
+            "sub",
             "pop local 1",
             // ifElse(bar(d), 1, -1)
             "push local 1",
@@ -711,7 +711,7 @@ mod tests {
             // Bool::eq(index, 0)
             "push argument 1",
             "push constant 0",
-            "call Bool.eq 2",
+            "eq",
             "push constant 0",
             "eq",
             "if-goto SKIP_TRUE_0",
@@ -733,14 +733,11 @@ mod tests {
         ]
         .join("\n");
 
-        assert!(dbg!(construct(
-            &function,
-            &mut module_context,
-            &mut program_context
-        ))
-        .is_ok_and(
-            |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
-        ));
+        assert!(
+            construct(&function, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
     }
 
     #[test]
