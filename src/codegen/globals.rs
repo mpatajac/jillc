@@ -7,7 +7,8 @@ use crate::{
 };
 
 use super::{
-    error::{FallableAction, FallableInstructions},
+    common::helpers::{self, variable::JillVariableExtensions},
+    error::{Error, FallableAction, FallableInstructions},
     GLOBALS_INIT_FN_NAME,
 };
 
@@ -16,6 +17,14 @@ pub fn construct(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableAction {
+    // check for discard in globals (which doesn't make sense)
+    if globals
+        .iter()
+        .any(helpers::variable::JillVariableExtensions::is_discard)
+    {
+        return Err(Error::DiscardInGlobal);
+    }
+
     let globals_assignment_instructions =
         construct_globals(&globals, module_context, program_context)?;
 
@@ -132,5 +141,28 @@ mod tests {
 
         // module should not be added to "globals to generate" list
         assert!(!program_context.globals.contains(module_name));
+    }
+
+    #[test]
+    fn test_discard_in_globals() {
+        let module_name = "Test";
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(module_name.to_owned());
+
+        let variables = vec![
+            ast::JillVariable {
+                name: ast::JillIdentifier(String::from("foo")),
+                value: ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
+            },
+            ast::JillVariable {
+                name: ast::JillIdentifier(String::new()),
+                value: ast::JillExpression::Literal(ast::JillLiteral::Bool(true)),
+            },
+        ];
+
+        assert!(
+            construct(variables, &mut module_context, &mut program_context)
+                .is_err_and(|err| matches!(err, Error::DiscardInGlobal))
+        );
     }
 }
