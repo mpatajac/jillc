@@ -89,7 +89,7 @@ mod tests {
             "function Test.f 0",
             "push argument 0",
             "push constant 2",
-            "call Math.add 2",
+            "add",
             "return",
         ];
         let expected_fn2 = vec![
