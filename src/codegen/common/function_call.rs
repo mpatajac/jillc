@@ -39,6 +39,8 @@ pub fn construct(
             direct_call::construct_module_local(
                 function_call,
                 function_context,
+                // NOTE: general expressions don't need special call construction
+                direct_call::NormalCallConstruction,
                 module_context,
                 program_context,
             )
@@ -57,7 +59,7 @@ fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstr
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum FunctionCallKind {
+pub(super) enum FunctionCallKind {
     CompilerInternal(CompilerInternalFunction),
     Variable(VariableContext),
     ModuleLocalFunction(FunctionContext),
@@ -65,7 +67,7 @@ enum FunctionCallKind {
     Invalid,
 }
 
-fn determine_function_call_kind(
+pub(super) fn determine_function_call_kind(
     function_reference: &ast::JillFunctionReference,
     module_context: &ModuleContext,
 ) -> FunctionCallKind {
@@ -158,7 +160,7 @@ mod variable_call {
     }
 }
 
-mod direct_call {
+pub(super) mod direct_call {
     use crate::codegen::{
         common::{expression, helpers::function::JillFunctionReferenceExtensions},
         context::module::FunctionContext,
@@ -167,6 +169,34 @@ mod direct_call {
     };
 
     use super::{ast, invalid_function_call, ModuleContext, ProgramContext};
+
+    pub trait CallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            local_call_info: Option<LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction>;
+    }
+
+    #[derive(Debug)]
+    pub struct NormalCallConstruction;
+
+    impl CallConstruction for NormalCallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            local_call_info: Option<LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction> {
+            vec![vm::call(
+                // TODO!: figure out naming
+                function_call.reference.to_fully_qualified_hack_name(
+                    &local_call_info.clone().unwrap_or_default().module_name,
+                    local_call_info.unwrap_or_default().prefix,
+                ),
+                function_call.arguments.len(),
+            )]
+        }
+    }
 
     pub(super) fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
@@ -183,12 +213,21 @@ mod direct_call {
             return invalid_function_call(function_call);
         }
 
-        construct(function_call, None, module_context, program_context)
+        construct(
+            function_call,
+            None,
+            // NOTE: module-foreign call cannot be recursive,
+            // so we can hardcode call construction
+            NormalCallConstruction,
+            module_context,
+            program_context,
+        )
     }
 
-    pub(super) fn construct_module_local(
+    pub fn construct_module_local(
         function_call: &ast::JillFunctionCall,
         function_context: FunctionContext,
+        call_construction: impl CallConstruction,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -200,13 +239,14 @@ mod direct_call {
         construct(
             function_call,
             Some(local_call_info),
+            call_construction,
             module_context,
             program_context,
         )
     }
 
     #[derive(Debug, Default, Clone)]
-    struct LocalCallInfo {
+    pub struct LocalCallInfo {
         module_name: String,
         prefix: String,
     }
@@ -214,6 +254,7 @@ mod direct_call {
     fn construct(
         function_call: &ast::JillFunctionCall,
         local_call_info: Option<LocalCallInfo>,
+        call_construction: impl CallConstruction,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -224,14 +265,7 @@ mod direct_call {
             .collect::<Result<Vec<_>, _>>()?
             .concat();
 
-        let call = vec![vm::call(
-            // TODO!: figure out naming
-            function_call.reference.to_fully_qualified_hack_name(
-                &local_call_info.clone().unwrap_or_default().module_name,
-                local_call_info.unwrap_or_default().prefix,
-            ),
-            function_call.arguments.len(),
-        )];
+        let call = call_construction.construct(function_call, local_call_info);
 
         Ok([argument_instructions, call].concat())
     }

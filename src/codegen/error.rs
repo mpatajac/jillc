@@ -11,6 +11,7 @@ pub enum Error {
     MultipleFunctionDefinitions(vm::VMFunctionName),
     InvalidFunctionCall(String),
     InvalidCompilerInternalFunctionCall(String),
+    CaptureInTopLevelFunction(String),
 }
 
 pub type FallableAction = Result<(), Error>;
