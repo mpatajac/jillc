@@ -12,6 +12,7 @@ pub enum Error {
     InvalidFunctionCall(String),
     InvalidCompilerInternalFunctionCall(String),
     CaptureInTopLevelFunction(String),
+    DiscardInGlobal,
 }
 
 pub type FallableAction = Result<(), Error>;
