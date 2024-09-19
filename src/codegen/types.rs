@@ -96,9 +96,13 @@ mod variant {
         let number_of_fields = number_of_fields(variant);
 
         let variant_tag = module_context.type_info.current_variant;
-        let function_name = ctor_name(variant, module_context);
+        let vm_function_name = ctor_name(variant, module_context);
 
-        add_function_to_scope(variant, function_name.clone(), module_context)?;
+        add_function_to_scope(
+            variant.name.0.clone(),
+            variant_arity(variant),
+            module_context,
+        )?;
 
         let field_assignment = |i: usize| {
             vec![
@@ -114,7 +118,7 @@ mod variant {
 
         let output_block = [
             vec![
-                vm::function(function_name, 0),
+                vm::function(vm_function_name, 0),
                 vm::push(Segment::Constant, number_of_fields),
                 vm::call(vm::VMFunctionName::from_literal("Memory.alloc"), 1),
                 vm::pop(Segment::Pointer, 0),
@@ -141,16 +145,19 @@ mod variant {
     ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
             // "{module_context.module_name}.{variant.name}_{field}"
-            let function_name = vm::VMFunctionName::construct(
+            let vm_function_name = vm::VMFunctionName::construct(
                 &module_context.module_name,
                 &format!("{}_", variant.name),
                 &field.0,
             );
 
-            add_function_to_scope(variant, function_name.clone(), module_context)?;
+            // function takes just object
+            let arity = 1;
+            let module_free_function_name = format!("{}_{}", variant.name, field.0);
+            add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let output_block = vec![
-                vm::function(vm::VMFunctionName::from_literal(&function_name), 0),
+                vm::function(vm::VMFunctionName::from_literal(&vm_function_name), 0),
                 vm::push(Segment::Argument, 0),
                 vm::pop(Segment::Pointer, 0),
                 // offset by one because `tag` is at `this 0`
@@ -180,13 +187,17 @@ mod variant {
             //     variant.name,
             //     field.0.to_title_case()
             // );
-            let function_name = vm::VMFunctionName::construct(
+            let vm_function_name = vm::VMFunctionName::construct(
                 &module_context.module_name,
                 &format!("{}_", variant.name),
                 &format!("update{}", field.0.to_title_case()),
             );
 
-            add_function_to_scope(variant, function_name.clone(), module_context)?;
+            // object + new field value
+            let arity = 2;
+            let module_free_function_name =
+                format!("{}_update{}", variant.name, field.0.to_title_case());
+            add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let ctor_arg_mapping = |i| {
                 if i == variant_index {
@@ -205,7 +216,7 @@ mod variant {
 
             let output_block = [
                 vec![
-                    vm::function(function_name, 0),
+                    vm::function(vm_function_name, 0),
                     vm::push(Segment::Argument, 0),
                     vm::pop(Segment::Pointer, 0),
                 ],
@@ -223,14 +234,14 @@ mod variant {
     /// Type-related functions have no nested functions,
     /// so we can instantly close their frame.
     fn add_function_to_scope(
-        variant: &ast::JillTypeVariant,
-        function_name: vm::VMFunctionName,
+        function_name: String,
+        arity: usize,
         module_context: &mut ModuleContext,
     ) -> FallableAction {
-        module_context.scope.enter_function(
-            function_name.to_string(),
-            FunctionContextArguments::new(number_of_arguments(variant)),
-        )?;
+        module_context
+            .scope
+            .enter_function(function_name, FunctionContextArguments::new(arity))?;
+
         module_context.scope.leave_function();
 
         Ok(())
@@ -244,13 +255,13 @@ mod variant {
         vm::VMFunctionName::construct(&module_context.module_name, "", &variant.name.0)
     }
 
-    fn number_of_arguments(variant: &ast::JillTypeVariant) -> usize {
+    fn variant_arity(variant: &ast::JillTypeVariant) -> usize {
         variant.fields.len()
     }
 
     fn number_of_fields(variant: &ast::JillTypeVariant) -> usize {
         // listed fields + tag
-        number_of_arguments(variant) + 1
+        variant_arity(variant) + 1
     }
 }
 
@@ -348,14 +359,13 @@ mod tests {
         // function added to scope
         assert!(module_context
             .scope
-            // TODO!: figure out naming
-            .search_function(&String::from("Bar.Bar_updateFoo1"))
+            .search_function(&String::from("Bar_updateFoo1"))
             .is_some());
 
         // `tag` function NOT in scope
         assert!(module_context
             .scope
-            .search_function(&String::from("Bar._tag"))
+            .search_function(&String::from("_tag"))
             .is_none());
     }
 
@@ -441,23 +451,28 @@ mod tests {
         // function added to scope
         assert!(module_context
             .scope
-            .search_function(&String::from("Option.None"))
+            .search_function(&String::from("None"))
             .is_some());
 
         assert!(module_context
             .scope
-            .search_function(&String::from("Option.Some_updateValue"))
+            .search_function(&String::from("Some_updateValue"))
             .is_some());
 
         // `tag` function NOT in scope
         assert!(module_context
             .scope
-            .search_function(&String::from("Bar.tag"))
+            .search_function(&String::from("_tag"))
             .is_none());
 
         assert!(module_context
             .scope
-            .search_function(&String::from("Bar._tag"))
+            .search_function(&String::from("Option._tag"))
+            .is_none());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Option.tag"))
             .is_none());
     }
 

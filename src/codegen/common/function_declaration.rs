@@ -36,7 +36,7 @@ pub fn construct(
 
     // register function in scope
     let function_context = module_context.scope.enter_function(
-        // TODO: figure out naming
+        // register only using function name - prefix will get constructed in the process
         function.name.0.clone(),
         FunctionContextArguments::new(arity).with_captures(capture_names),
     )?;
@@ -261,7 +261,6 @@ mod tail_recursion {
                 if has_original_name(&function_call.reference, &self.original_function_name) {
                     if let Some(function_context) = module_context
                         .scope
-                        // TODO: figure out naming
                         .search_function(&function_call.reference.function_name.0)
                     {
                         return function_call::direct_call::construct_module_local(

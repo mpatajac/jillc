@@ -315,12 +315,13 @@ fn construct_match(
     // region: Construction
 
     let tag_fn_reference = ast::JillFunctionReference {
-        associated_type: None,
-        function_name: ast::JillIdentifier(String::from("_tag")),
         modules_path: function_reference.modules_path.clone(),
+        associated_type: function_reference.associated_type.clone(),
+        function_name: ast::JillIdentifier(String::from("tag")),
     };
-    // TODO: figure out naming
-    // `_tag` is a top-level function, so it is not nested (no need for prefix)
+
+    // `{Type}_tag` is a type-associated top-level function, so it is not nested (no need for prefix)
+    // might be a locally-defined type, so we provide current module's name as default
     let tag_fn_name =
         tag_fn_reference.to_fully_qualified_hack_name(&module_context.module_name, String::new());
 
@@ -696,7 +697,7 @@ mod tests {
         let expected = [
             // tag
             "push local 0",
-            "call Option._tag 1",
+            "call Option.Option_tag 1",
             "pop temp 0",
             // variant checks
             "push temp 0",

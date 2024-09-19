@@ -118,7 +118,6 @@ pub(super) fn determine_function_call_kind(
     // so we can use context for name prefix
     if let Some(function_context) = module_context
         .scope
-        // TODO!: figure out naming
         .search_function(&function_reference.function_name.0)
     {
         return FunctionCallKind::ModuleLocalFunction(function_context);
@@ -210,7 +209,6 @@ pub(super) mod direct_call {
             local_call_info: Option<LocalCallInfo>,
         ) -> Vec<vm::VMInstruction> {
             vec![vm::call(
-                // TODO!: figure out naming
                 function_call.reference.to_fully_qualified_hack_name(
                     &local_call_info.clone().unwrap_or_default().module_name,
                     local_call_info.unwrap_or_default().prefix,

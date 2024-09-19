@@ -33,6 +33,7 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
         format!("{module_path}{type_path}{function_name}")
     }
 
+    // TODO: try to do this more elegantly (and give a nicer name)
     fn to_fully_qualified_hack_name(
         &self,
         local_module_name: &String,

@@ -1,11 +1,6 @@
-use std::{collections::HashMap, iter};
+use std::collections::HashMap;
 
-use strum::VariantArray;
-
-use crate::codegen::{
-    error::{Error, FallableAction},
-    vm,
-};
+use crate::codegen::{error::Error, vm};
 
 // region: Context
 
@@ -61,6 +56,7 @@ pub enum ScopeSearchOutcome {
 }
 
 type Name = String;
+type ModuleFreeName = String;
 
 impl Scope {
     pub fn new() -> Self {
@@ -74,9 +70,13 @@ impl Scope {
     /// and add new frame for this function.
     ///
     /// This is usually performed during a function definition.
+    ///
+    /// **NOTE:** Since this information is already related to a module,
+    /// the `name` should not contain module part of the name
+    /// (only function name (as written in source code) and possible associated variant).
     pub fn enter_function(
         &mut self,
-        name: Name,
+        name: ModuleFreeName,
         context_arguments: FunctionContextArguments,
     ) -> Result<FunctionContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
@@ -145,8 +145,11 @@ impl Scope {
 
     /// Search through the scope frames for a function with
     /// a given identifier, returning its context upon a successful search.
-    // TODO!: figure out how (in what form) to store names!!!!!
-    pub fn search_function(&self, identifier: &Name) -> Option<FunctionContext> {
+    ///
+    /// **NOTE:** Since this information is already related to a module,
+    /// the `name` should not contain module part of the name
+    /// (only function name (as written in source code) and possible associated variant).
+    pub fn search_function(&self, identifier: &ModuleFreeName) -> Option<FunctionContext> {
         self.frames
             .iter()
             .rev()
