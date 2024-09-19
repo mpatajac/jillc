@@ -23,13 +23,18 @@ pub fn construct_module(
     let mut module_context = ModuleContext::new(module.name);
 
     types::construct(module.content.types, &mut module_context, program_context)?;
+
     globals::construct(
         module.content.variables,
         &mut module_context,
         program_context,
     )?;
 
-    // TODO: fns
+    functions::construct(
+        module.content.functions,
+        &mut module_context,
+        program_context,
+    )?;
 
     Ok(module_context.output.compile())
 }
