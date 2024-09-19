@@ -13,7 +13,12 @@ use crate::{
     common::{ast, CompilerInternalFunction},
 };
 
-use super::{compiler_internal_call, helpers::function::JillFunctionReferenceExtensions};
+use super::{
+    compiler_internal_call,
+    helpers::{
+        self, function::JillFunctionReferenceExtensions, function_override::FunctionOverrideKind,
+    },
+};
 
 pub fn construct(
     function_call: &ast::JillFunctionCall,
@@ -48,6 +53,12 @@ pub fn construct(
         FunctionCallKind::ModuleForeignFunction => {
             direct_call::construct_module_foreign(function_call, module_context, program_context)
         }
+        FunctionCallKind::Override(override_kind) => direct_call::construct_override(
+            function_call,
+            override_kind,
+            module_context,
+            program_context,
+        ),
         FunctionCallKind::Invalid => invalid_function_call(function_call),
     }
 }
@@ -64,6 +75,7 @@ pub(super) enum FunctionCallKind {
     Variable(VariableContext),
     ModuleLocalFunction(FunctionContext),
     ModuleForeignFunction,
+    Override(FunctionOverrideKind),
     Invalid,
 }
 
@@ -83,6 +95,11 @@ pub(super) fn determine_function_call_kind(
     }
 
     if function_reference.is_fully_qualified() {
+        // check for overrides
+        if let Some(override_kind) = helpers::function_override::find_override(function_reference) {
+            return FunctionCallKind::Override(override_kind);
+        }
+
         // regular, direct call to a function from another module
         return FunctionCallKind::ModuleForeignFunction;
     }
@@ -162,7 +179,12 @@ mod variable_call {
 
 pub(super) mod direct_call {
     use crate::codegen::{
-        common::{expression, helpers::function::JillFunctionReferenceExtensions},
+        common::{
+            expression,
+            helpers::{
+                function::JillFunctionReferenceExtensions, function_override::FunctionOverrideKind,
+            },
+        },
         context::module::FunctionContext,
         error::FallableInstructions,
         jillstd, vm,
@@ -268,6 +290,47 @@ pub(super) mod direct_call {
         let call = call_construction.construct(function_call, local_call_info);
 
         Ok([argument_instructions, call].concat())
+    }
+
+    #[derive(Debug)]
+    struct OverrideCallConstruction(FunctionOverrideKind);
+
+    impl CallConstruction for OverrideCallConstruction {
+        fn construct(
+            self,
+            function_call: &ast::JillFunctionCall,
+            _: Option<LocalCallInfo>,
+        ) -> Vec<vm::VMInstruction> {
+            let instruction = match self.0 {
+                FunctionOverrideKind::VM(vm_command) => vm::command(vm_command),
+                FunctionOverrideKind::JackStd(module_name, function_name) => {
+                    // Jack std has no type-associated functions
+                    let vm_function_name =
+                        vm::VMFunctionName::construct(module_name, "", function_name);
+
+                    vm::call(vm_function_name, function_call.arguments.len())
+                }
+            };
+
+            vec![instruction]
+        }
+    }
+
+    pub(super) fn construct_override(
+        function_call: &ast::JillFunctionCall,
+        override_kind: FunctionOverrideKind,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        // no need to track (potential) `JillStd` function occurences
+
+        construct(
+            function_call,
+            None,
+            OverrideCallConstruction(override_kind),
+            module_context,
+            program_context,
+        )
     }
 }
 
