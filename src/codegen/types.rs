@@ -44,8 +44,9 @@ fn construct_tag(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) {
-    // "{module_context.module_name}._tag"
-    let function_name = vm::VMFunctionName::construct(&module_context.module_name, "", "_tag");
+    // "{module_context.module_name}.{type_name}_tag"
+    let function_name =
+        vm::VMFunctionName::construct(&module_context.module_name, &jill_type.name.0, "_tag");
 
     // NOTE: this function is meant for internal usage,
     // so we DO NOT add it to module scope.
@@ -277,7 +278,7 @@ mod tests {
         }];
 
         let tag = vec![
-            "function Bar._tag 0",
+            "function Bar.Bar_tag 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
@@ -380,7 +381,7 @@ mod tests {
         }];
 
         let tag = vec![
-            "function Option._tag 0",
+            "function Option.Option_tag 0",
             "push argument 0",
             "pop pointer 0",
             "push this 0",
@@ -458,5 +459,126 @@ mod tests {
             .scope
             .search_function(&String::from("Bar._tag"))
             .is_none());
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_multiple_types() {
+        // setup
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // type Foo = Foo(value).
+        // type Bar = Baz(x).
+        let types = vec![
+            ast::JillType {
+                name: ast::JillIdentifier(String::from("Foo")),
+                variants: vec![ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("Foo")),
+                    fields: vec![ast::JillIdentifier(String::from("value"))],
+                }],
+            },
+            ast::JillType {
+                name: ast::JillIdentifier(String::from("Bar")),
+                variants: vec![ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("Baz")),
+                    fields: vec![ast::JillIdentifier(String::from("x"))],
+                }],
+            },
+        ];
+
+        let foo_tag = vec![
+            "function Test.Foo_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let foo_ctor = vec![
+            "function Test.Foo 0",
+            "push constant 2",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 1",
+            "push constant 0",
+            "pop this 0",
+            "push pointer 0",
+            "return",
+        ];
+
+        let foo_get_value = vec![
+            "function Test.Foo_value 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 1",
+            "return",
+        ];
+
+        let foo_update_value = vec![
+            "function Test.Foo_updateValue 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "call Test.Foo 1",
+            "return",
+        ];
+
+        let bar_tag = vec![
+            "function Test.Bar_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let baz_ctor = vec![
+            "function Test.Baz 0",
+            "push constant 2",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 1",
+            "push constant 0",
+            "pop this 0",
+            "push pointer 0",
+            "return",
+        ];
+
+        let baz_get_x = vec![
+            "function Test.Baz_x 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 1",
+            "return",
+        ];
+
+        let baz_update_x = vec![
+            "function Test.Baz_updateX 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "call Test.Baz 1",
+            "return",
+        ];
+
+        let expected = [
+            foo_tag,
+            foo_ctor,
+            foo_get_value,
+            foo_update_value,
+            bar_tag,
+            baz_ctor,
+            baz_get_x,
+            baz_update_x,
+        ]
+        .concat()
+        .join("\n");
+
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
+
+        // compiled instructions match expected ones
+        assert_eq!(module_context.output.compile(), expected);
     }
 }
