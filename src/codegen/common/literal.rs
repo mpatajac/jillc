@@ -64,6 +64,8 @@ fn construct_list(
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
+    note_std_list_constructor_usage("Empty", program_context);
+
     // start with an empty list
     let empty_list = vec![vm::call(vm::VMFunctionName::from_literal("List.Empty"), 0)];
 
@@ -71,6 +73,8 @@ fn construct_list(
         // no elements, just return the empty list
         return Ok(empty_list);
     };
+
+    note_std_list_constructor_usage("List", program_context);
 
     let temp_index = program_context.temp_segment_index.request();
     let temp_storage = VariableContext {
@@ -102,6 +106,18 @@ fn construct_list(
     program_context.temp_segment_index.release();
 
     Ok([empty_list, instructions].concat())
+}
+
+fn note_std_list_constructor_usage(constructor: &str, program_context: &mut ProgramContext) {
+    let function_reference = ast::JillFunctionReference {
+        modules_path: vec![ast::JillIdentifier(String::from("List"))],
+        associated_type: None,
+        function_name: ast::JillIdentifier(constructor.to_owned()),
+    };
+
+    program_context
+        .std_usage_tracker
+        .note_usage(&function_reference);
 }
 
 fn to_ascii(c: char) -> usize {
