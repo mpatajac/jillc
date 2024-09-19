@@ -626,8 +626,8 @@ mod tests {
            fn at list index =
                ifElse(
                    Bool::eq(index, 0),
-                   ListExt::List:head(list),
-                   at(ListExt::List:tail(list), Utils::MathExt::dec(index))
+                   List::List:head(list),
+                   at(List::List:tail(list), Utils::MathExt::dec(index))
                ).
         */
         let function = JillFunction {
@@ -660,7 +660,7 @@ mod tests {
                         }),
                         JillExpression::FunctionCall(JillFunctionCall {
                             reference: JillFunctionReference {
-                                modules_path: vec![JillIdentifier("ListExt".to_owned())],
+                                modules_path: vec![JillIdentifier("List".to_owned())],
                                 associated_type: Some(JillIdentifier("List".to_owned())),
                                 function_name: JillIdentifier("head".to_owned()),
                             },
@@ -677,7 +677,7 @@ mod tests {
                             arguments: vec![
                                 JillExpression::FunctionCall(JillFunctionCall {
                                     reference: JillFunctionReference {
-                                        modules_path: vec![JillIdentifier("ListExt".to_owned())],
+                                        modules_path: vec![JillIdentifier("List".to_owned())],
                                         associated_type: Some(JillIdentifier("List".to_owned())),
                                         function_name: JillIdentifier("tail".to_owned()),
                                     },
@@ -715,14 +715,14 @@ mod tests {
             "push constant 0",
             "eq",
             "if-goto SKIP_TRUE_0",
-            // ListExt::List:head(list)
+            // List::List:head(list)
             "push argument 0",
-            "call ListExt.List_head 1",
+            "call List.List_head 1",
             "goto SKIP_FALSE_0",
             "label SKIP_TRUE_0",
-            // at(ListExt::List:tail(list), Utils::MathExt::dec(index))
+            // at(List::List:tail(list), Utils::MathExt::dec(index))
             "push argument 0",
-            "call ListExt.List_tail 1",
+            "call List.List_tail 1",
             "push argument 1",
             "call Utils_MathExt.dec 1",
             "pop argument 1",

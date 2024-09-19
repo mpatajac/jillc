@@ -4,7 +4,7 @@ use strum::VariantNames;
 
 use crate::common::ast;
 
-use super::{common::helpers::function::JillFunctionReferenceExtensions, error::Error, vm};
+use super::{common::helpers::function::JillFunctionReferenceExtensions, vm};
 
 // region: JillStd declaration
 
@@ -67,6 +67,17 @@ enum JillStdBool {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, strum::EnumString, strum::VariantNames)]
 #[strum(serialize_all = "camelCase")]
 enum JillStdList {
+    // type-associated functions
+    #[strum(serialize = "Empty")]
+    Empty,
+    #[strum(serialize = "List")]
+    List,
+    #[strum(serialize = "List_head")]
+    Head,
+    #[strum(serialize = "List_tail")]
+    Tail,
+
+    // module functions
     Map,
     Filter,
     Fold,
@@ -75,7 +86,7 @@ enum JillStdList {
     Zip,
     All,
     Any,
-    Empty,
+    IsEmpty,
     Concat,
     Range,
 }
@@ -91,6 +102,11 @@ enum JillStdFn {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, strum::EnumString, strum::VariantNames)]
 #[strum(serialize_all = "camelCase")]
 enum JillStdRandom {
+    // type-associated functions
+    #[strum(serialize = "Random")]
+    Random,
+
+    // module functions
     Next,
     FromRange,
 }
@@ -159,8 +175,14 @@ impl JillStdUsageTracker {
         };
 
         // check that the function reference function name is one of ones in the module
-        let function_name = function_reference.function_name.0.as_str();
-        let Some(function_used) = module_functions.get_mut(function_name) else {
+        let associated_type = function_reference
+            .associated_type
+            .clone()
+            .map(|t| format!("{t}_"))
+            .unwrap_or_default();
+
+        let function_name = associated_type + &function_reference.function_name.0;
+        let Some(function_used) = module_functions.get_mut(function_name.as_str()) else {
             return JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule;
         };
 
@@ -249,6 +271,30 @@ mod tests {
         assert_eq!(
             usage_tracker.note_usage(&function_reference),
             JillStdFunctionUsageNoteOutcome::NotPartOfJillStd
+        );
+
+        // case 6 (type constructor)
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("List"))],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("Empty")),
+        };
+
+        assert_eq!(
+            usage_tracker.note_usage(&function_reference),
+            JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
+        );
+
+        // case 7 (variant-associated function)
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("List"))],
+            associated_type: Some(ast::JillIdentifier(String::from("List"))),
+            function_name: ast::JillIdentifier(String::from("tail")),
+        };
+
+        assert_eq!(
+            usage_tracker.note_usage(&function_reference),
+            JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
         );
     }
 }
