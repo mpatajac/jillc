@@ -37,6 +37,10 @@ enum JillStdMath {
     Inc,
     /// `--`
     Dec,
+    // Jack std name matches
+    Min,
+    Max,
+    Sqrt,
 }
 
 /// List of functions available inside Jill-specific `Bool` standard module.
