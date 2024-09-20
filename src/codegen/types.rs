@@ -73,7 +73,7 @@ mod variant {
 
     use super::{ast, ModuleContext, ProgramContext};
 
-    use heck::ToTitleCase;
+    use heck::ToUpperCamelCase;
 
     pub(super) fn construct(
         variant: &ast::JillTypeVariant,
@@ -188,12 +188,15 @@ mod variant {
             //     "{}.{}_update{}",
             //     module_context.module_name,
             //     variant.name,
-            //     field.0.to_title_case()
+            //     field.0.to_upper_camel_case()
             // );
             let function_reference = ast::JillFunctionReference {
                 modules_path: vec![],
                 associated_type: Some(variant.name.clone()),
-                function_name: ast::JillIdentifier(format!("update{}", field.0.to_title_case())),
+                function_name: ast::JillIdentifier(format!(
+                    "update{}",
+                    field.0.to_upper_camel_case()
+                )),
             };
             let vm_function_name = function_reference
                 .to_fully_qualified_hack_name(&module_context.module_name, String::new());
