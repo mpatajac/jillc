@@ -9,6 +9,7 @@ pub trait JillFunctionReferenceExtensions {
         function_prefix: String,
     ) -> vm::VMFunctionName;
     fn from_function_definition(function_definition: &ast::JillFunction) -> Self;
+    fn type_associated_function_name(&self) -> String;
 }
 
 impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
@@ -73,6 +74,16 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
             associated_type: None,
             function_name: function_definition.name.clone(),
         }
+    }
+
+    fn type_associated_function_name(&self) -> String {
+        let associated_type_prefix = self
+            .associated_type
+            .clone()
+            .map(|t| format!("{t}_"))
+            .unwrap_or_default();
+
+        associated_type_prefix + &self.function_name.0
     }
 }
 
@@ -177,6 +188,45 @@ mod tests {
         assert_eq!(
             function_reference.to_fully_qualified_hack_name(module_name, function_prefix),
             vm::VMFunctionName::from_literal("Foo.bar_baz_biz")
+        );
+    }
+
+    #[test]
+    fn test_type_associated_function_name() {
+        // case 1 (no associated type)
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("test")),
+        };
+
+        assert_eq!(
+            function_reference.type_associated_function_name(),
+            String::from("test")
+        );
+
+        // case 2 (associated type)
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: Some(ast::JillIdentifier(String::from("Type"))),
+            function_name: ast::JillIdentifier(String::from("test")),
+        };
+
+        assert_eq!(
+            function_reference.type_associated_function_name(),
+            String::from("Type_test")
+        );
+
+        // case 3 (module present - doesn't change a thing)
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Mod"))],
+            associated_type: Some(ast::JillIdentifier(String::from("Type"))),
+            function_name: ast::JillIdentifier(String::from("test")),
+        };
+
+        assert_eq!(
+            function_reference.type_associated_function_name(),
+            String::from("Type_test")
         );
     }
 }

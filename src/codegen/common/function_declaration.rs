@@ -261,7 +261,7 @@ mod tail_recursion {
                 if has_original_name(&function_call.reference, &self.original_function_name) {
                     if let Some(function_context) = module_context
                         .scope
-                        .search_function(&function_call.reference.function_name.0)
+                        .search_function(&function_call.reference.type_associated_function_name())
                     {
                         return function_call::direct_call::construct_module_local(
                             function_call,

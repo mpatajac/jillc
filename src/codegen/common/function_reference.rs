@@ -15,7 +15,7 @@ pub fn construct(
 ) -> FallableInstructions {
     let function_context = module_context
         .scope
-        .search_function(&function_reference.function_name.0);
+        .search_function(&function_reference.type_associated_function_name());
 
     if !is_valid_function_reference(function_reference, &function_context) {
         return invalid_function_reference(function_reference);
