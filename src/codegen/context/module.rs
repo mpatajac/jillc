@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use crate::codegen::{
-    self,
-    error::{Error, FallableAction},
-    vm,
-};
+use crate::codegen::{error::Error, vm};
 
 // region: Context
 
@@ -52,100 +48,189 @@ pub struct Scope {
     frames: Vec<ScopeFrame>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ScopeSearchOutcome {
-    NotFound,
-    Variable(VariableContext),
-    Function(FunctionContext),
-}
-
 type Name = String;
+type ModuleFreeName = String;
 
 impl Scope {
     pub fn new() -> Self {
         Self {
             // initialize with the module-level scope
-            frames: vec![ScopeFrame::new()],
+            frames: vec![ScopeFrame::new(String::new())],
         }
     }
 
-    /// Add a new frame to scope.
-    /// This is usually performed when entering a new function definition.
-    pub fn add_frame(&mut self) {
-        self.frames.push(ScopeFrame::new());
+    /// Add a function to the (latest frame of the) scope
+    /// and add new frame for this function.
+    ///
+    /// This is usually performed during a function definition.
+    ///
+    /// **NOTE:** Since this information is already related to a module,
+    /// the `name` should not contain module part of the name
+    /// (only function name (as written in source code) and possible associated variant).
+    pub fn enter_function(
+        &mut self,
+        name: ModuleFreeName,
+        context_arguments: FunctionContextArguments,
+    ) -> Result<FunctionContext, Error> {
+        // check for existing functions/variables with the same name (to prevent shadowing)
+        if self.search_variable(&name).is_some() {
+            return Err(Error::VariableAlreadyInScope(name));
+        }
+        if self.search_function(&name).is_some() {
+            return Err(Error::FunctionAlreadyInScope(name));
+        }
+
+        let context = FunctionContext {
+            arity: context_arguments.arity,
+            prefix: self.construct_function_prefix(),
+            captures: context_arguments.captures.unwrap_or_default(),
+        };
+
+        // add to list of existing functions
+        self.last_mut_frame()
+            .functions
+            .insert(name.clone(), context.clone());
+
+        // create a frame for the new function
+        self.frames.push(ScopeFrame::new(name));
+
+        Ok(context)
     }
 
-    /// Drop the last frame from the scope.
+    /// Denote that a function definition is ending and that
+    /// it should not contain further declarations.
+    ///
     /// This is usually performed when leaving a function definition.
-    pub fn drop_frame(&mut self) {
+    pub fn leave_function(&mut self) {
         self.frames.pop();
     }
 
-    /// Add a new function to the (latest frame of the) scope.
-    /// This is usually performed after a function definition.
-    pub fn add_function(&mut self, name: Name, context: FunctionContext) -> FallableAction {
+    /// Add a new variable to the (latest frame of the) scope.
+    ///
+    /// This is usually performed during a variable definition.
+    pub fn add_variable(
+        &mut self,
+        name: Name,
+        context_arguments: VariableContextArguments,
+    ) -> Result<VariableContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
-        match self.search(&name) {
-            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
-            ScopeSearchOutcome::NotFound => {
-                self.last_frame().functions.insert(name, context);
-                Ok(())
-            }
+        if self.search_variable(&name).is_some() {
+            return Err(Error::VariableAlreadyInScope(name));
         }
+        if self.search_function(&name).is_some() {
+            return Err(Error::FunctionAlreadyInScope(name));
+        }
+
+        let segment_index = self
+            .last_mut_frame()
+            .variable_segment_indices
+            .add_variable(context_arguments.segment);
+
+        let context = VariableContext {
+            segment: context_arguments.segment,
+            index: segment_index,
+        };
+
+        self.last_mut_frame()
+            .variables
+            .insert(name, context.clone());
+
+        Ok(context)
     }
 
-    /// Add a new variable to the (latest frame of the) scope.
-    /// This is usually performed after a variable definition.
-    pub fn add_variable(&mut self, name: Name, context: VariableContext) -> FallableAction {
-        // check for existing functions/variables with the same name (to prevent shadowing)
-        match self.search(&name) {
-            ScopeSearchOutcome::Variable(_) => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function(_) => Err(Error::FunctionAlreadyInScope(name)),
-            ScopeSearchOutcome::NotFound => {
-                self.last_frame().variables.insert(name, context);
-                Ok(())
-            }
-        }
+    /// Search through the scope frames for a function with
+    /// a given identifier, returning its context upon a successful search.
+    ///
+    /// **NOTE:** Since this information is already related to a module,
+    /// the `name` should not contain module part of the name
+    /// (only function name (as written in source code) and possible associated variant).
+    pub fn search_function(&self, identifier: &ModuleFreeName) -> Option<FunctionContext> {
+        self.frames
+            .iter()
+            .rev()
+            .find_map(|frame| frame.functions.get(identifier))
+            .cloned()
+    }
+
+    /// Search through the scope frames for an accessible (global or very local) variable
+    /// with a given identifier, returning its context upon a successful search.
+    pub fn search_variable(&self, identifier: &Name) -> Option<VariableContext> {
+        // first check last (current) frame
+        self.last_frame()
+            .variables
+            .get(identifier)
+            .or_else(
+                // if not, check globals in the first (module) frame
+                || self.first_frame().variables.get(identifier),
+            )
+            .cloned()
+    }
+
+    /// Constructs a prefix from previously defined functions
+    /// in which (a potential) current function is nested.
+    ///
+    /// E.g. function `bar` defined inside the function `foo`
+    /// would have a prefix of `foo_` and full name of `foo_bar`.
+    fn construct_function_prefix(&self) -> String {
+        self.frames
+            .iter()
+            // skip first (module-level) frame, as it does not
+            // have an owner, an therefore a valid prefix
+            .skip(1)
+            .map(|frame| frame.owner.clone() + "_")
+            .collect()
+    }
+
+    /// Returns the first (module-level) scope frame.
+    fn first_frame(&self) -> &ScopeFrame {
+        self.frames
+            .first()
+            .expect("scope shoule at least have the module-level frame")
     }
 
     /// Returns the last (latest, currently active) scope frame.
-    fn last_frame(&mut self) -> &mut ScopeFrame {
+    fn last_frame(&self) -> &ScopeFrame {
+        self.frames
+            .last()
+            .expect("scope shoule at least have the module-level frame")
+    }
+    /// Returns the mutable last (latest, currently active) scope frame.
+    fn last_mut_frame(&mut self) -> &mut ScopeFrame {
         self.frames
             .last_mut()
             .expect("scope shoule at least have the module-level frame")
     }
 
-    /// Search through the scope frames for a (local) variable
-    /// or a function with a given identifier,
-    /// returning its context upon a successful search.
-    // TODO?: split into separate functions (for vars/funcs)
-    pub fn search(&self, identifier: &Name) -> ScopeSearchOutcome {
-        // search from latest (last) to oldest (first)
-        for frame in self.frames.iter().rev() {
-            // variables have priority
-            if let Some(variable) = frame.variables.get(identifier) {
-                return ScopeSearchOutcome::Variable(variable.clone());
-            }
+    /// Gets current label index and increases it for future usage.
+    pub fn create_label(&mut self, label: &str) -> String {
+        let label_index = *self
+            .last_mut_frame()
+            .used_labels
+            .entry(label.to_owned())
+            .and_modify(|idx| *idx += 1)
+            .or_default();
 
-            if let Some(function) = frame.functions.get(identifier) {
-                return ScopeSearchOutcome::Function(function.clone());
-            }
-        }
-
-        ScopeSearchOutcome::NotFound
+        format!("{label}_{label_index}")
     }
 }
 
+type Label = String;
+
 #[derive(Debug)]
 pub struct ScopeFrame {
+    owner: Name,
+    variable_segment_indices: VariableSegmentIndices,
+    used_labels: HashMap<Label, usize>,
     functions: HashMap<Name, FunctionContext>,
     variables: HashMap<Name, VariableContext>,
 }
 
 impl ScopeFrame {
-    fn new() -> Self {
+    fn new(owner: Name) -> Self {
         Self {
+            owner,
+            variable_segment_indices: VariableSegmentIndices::new(),
+            used_labels: HashMap::new(),
             functions: HashMap::new(),
             variables: HashMap::new(),
         }
@@ -153,15 +238,101 @@ impl ScopeFrame {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FunctionContextArguments {
+    arity: usize,
+    captures: Option<Vec<String>>,
+}
+
+impl FunctionContextArguments {
+    pub const fn new(arity: usize) -> Self {
+        Self {
+            arity,
+            captures: None,
+        }
+    }
+
+    pub fn with_captures(self, captures: Vec<String>) -> Self {
+        Self {
+            captures: Some(captures),
+            ..self
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionContext {
-    pub number_of_arguments: usize,
+    pub arity: usize,
+    pub prefix: String,
+    pub captures: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariableContextArguments {
+    segment: vm::Segment,
+}
+
+impl VariableContextArguments {
+    pub const fn new(segment: vm::Segment) -> Self {
+        Self { segment }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VariableContext {
-    // TODO?: separate variables by segments?
     pub segment: vm::Segment,
     pub index: usize,
+}
+
+impl VariableContext {
+    /// Helper function for performing a `push`
+    /// action with the variable's segment and index.
+    pub fn push(&self) -> Vec<vm::VMInstruction> {
+        match self.segment {
+            // since `Capture` is not a proper VM segment, we need to do some extra work
+            vm::Segment::Capture(array_index) => {
+                vec![
+                    vm::push(vm::Segment::Constant, self.index),
+                    vm::push(vm::Segment::Argument, array_index),
+                    vm::command(vm::VMCommand::Add),
+                    vm::pop(vm::Segment::Pointer, 1),
+                    vm::push(vm::Segment::That, 0),
+                ]
+            }
+            segment => vec![vm::push(segment, self.index)],
+        }
+    }
+
+    /// Helper function for performing a `pop`
+    /// action with the variable's segment and index.
+    pub fn pop(&self) -> vm::VMInstruction {
+        if matches!(self.segment, vm::Segment::Capture(_)) {
+            panic!("called `pop` on a `capture` variable context");
+        }
+
+        vm::pop(self.segment, self.index)
+    }
+}
+
+#[derive(Debug)]
+struct VariableSegmentIndices {
+    indices: HashMap<vm::Segment, usize>,
+}
+
+impl VariableSegmentIndices {
+    fn new() -> Self {
+        Self {
+            indices: HashMap::new(),
+        }
+    }
+
+    /// Gets current segment index and increases it for future usage.
+    fn add_variable(&mut self, segment: vm::Segment) -> usize {
+        *self
+            .indices
+            .entry(segment)
+            .and_modify(|idx| *idx += 1)
+            .or_default()
+    }
 }
 
 // endregion
@@ -175,141 +346,120 @@ mod tests {
     fn test_scope() {
         let mut scope = super::Scope::new();
 
+        assert_eq!(scope.construct_function_prefix(), String::new());
+
+        // let foo = _.
         assert!(scope
             .add_variable(
                 "foo".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Static,
-                    index: 0,
-                },
-            )
-            .is_ok());
-
-        assert!(scope
-            .add_function(
-                "f".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 2
-                },
+                super::VariableContextArguments::new(vm::Segment::Static)
             )
             .is_ok());
 
         // fn f a b = _.
-        scope.add_frame();
+        assert!(scope
+            .enter_function("f".to_string(), super::FunctionContextArguments::new(2))
+            .is_ok());
 
         assert!(scope
             .add_variable(
                 "a".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
         assert!(scope
             .add_variable(
                 "b".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 1,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
-        scope.drop_frame();
-
+        // check that variable has correct segment index
         assert!(scope
-            .add_function(
-                "g".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 1
-                },
-            )
-            .is_ok());
+            .search_variable(&"b".to_string())
+            .is_some_and(|ctx| ctx.segment == vm::Segment::Argument && ctx.index == 1));
+
+        assert_eq!(scope.construct_function_prefix(), String::from("f_"));
+
+        scope.leave_function();
 
         // fn g x = ...
-        scope.add_frame();
+        assert!(scope
+            .enter_function("g".to_string(), super::FunctionContextArguments::new(1))
+            .is_ok());
 
         assert!(scope
             .add_variable(
                 "x".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
         // nested function
+        // fn baz a [x] = _.
         assert!(scope
-            .add_function(
+            .enter_function(
                 "baz".to_string(),
-                super::FunctionContext {
-                    number_of_arguments: 1
-                },
+                super::FunctionContextArguments::new(1).with_captures(vec![String::from("x")])
             )
             .is_ok());
-
-        // fn baz a = _.
-        scope.add_frame();
 
         // `a` already existed, but it was defined in previous function,
         // so by now it should have gone out of scope
         assert!(scope
             .add_variable(
                 "a".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Argument)
             )
             .is_ok());
 
-        scope.drop_frame();
+        // nested scope frame, variable segment indices should reset
+        assert!(scope
+            .search_variable(&"a".to_string())
+            .is_some_and(|ctx| ctx.segment == vm::Segment::Argument && ctx.index == 0));
+
+        assert_eq!(scope.construct_function_prefix(), String::from("g_baz_"));
+
+        // check that capture is part of the context
+        assert!(scope
+            .search_function(&"baz".to_string())
+            .is_some_and(|ctx| ctx.captures == vec!["x"]));
+
+        scope.leave_function();
 
         // variable local to the `fn g` scope
         assert!(scope
             .add_variable(
                 "bar".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 0,
-                },
+                super::VariableContextArguments::new(vm::Segment::Local)
             )
             .is_ok());
 
         assert!(matches!(
-            scope.search(&"f".to_string()),
-            super::ScopeSearchOutcome::Function(super::FunctionContext {
-                number_of_arguments
+            scope.search_function(&"f".to_string()),
+            Some(super::FunctionContext {
+                arity,
+                prefix,
+                captures
             })
         ));
 
         assert!(matches!(
-            scope.search(&"bar".to_string()),
-            super::ScopeSearchOutcome::Variable(super::VariableContext { segment, index })
+            scope.search_variable(&"bar".to_string()),
+            Some(super::VariableContext { segment, index })
         ));
 
-        assert!(matches!(
-            scope.search(&"jill".to_string()),
-            super::ScopeSearchOutcome::NotFound
-        ));
+        assert!(scope.search_function(&"jill".to_string()).is_none());
 
         // occured twice, but went out of scope both times
-        assert!(matches!(
-            scope.search(&"a".to_string()),
-            super::ScopeSearchOutcome::NotFound
-        ));
+        assert!(scope.search_variable(&"a".to_string()).is_none());
 
         // variable with a same name already exists (global)
         assert!(scope
             .add_variable(
                 "foo".to_string(),
-                super::VariableContext {
-                    segment: vm::Segment::Local,
-                    index: 1,
-                },
+                super::VariableContextArguments::new(vm::Segment::Local),
             )
             .is_err_and(|err| matches!(err, codegen::error::Error::VariableAlreadyInScope(_))));
     }

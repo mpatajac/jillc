@@ -1,67 +1,117 @@
 use crate::common::ast;
 
-use super::context::{self, ModuleContext, ProgramContext};
+use super::{
+    context::{self, ModuleContext, ProgramContext},
+    error::FallableAction,
+    vm::{self, Segment},
+};
 
 pub fn construct(
     types: Vec<ast::JillType>,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) {
+) -> FallableAction {
     for jill_type in types {
         // reset stored type info
         module_context.type_info = context::module::TypeInfo::new();
 
-        construct_type(jill_type, module_context, program_context);
+        construct_type(&jill_type, module_context, program_context)?;
     }
+
+    Ok(())
 }
 
 fn construct_type(
-    jill_type: ast::JillType,
+    jill_type: &ast::JillType,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) {
+) -> FallableAction {
     module_context.type_info.current_variant = 0;
 
-    for variant in jill_type.variants {
-        variant::construct(variant, module_context, program_context);
+    construct_tag(jill_type, module_context, program_context);
+
+    for variant in &jill_type.variants {
+        variant::construct(variant, module_context, program_context)?;
 
         module_context.type_info.current_variant += 1;
     }
+
+    Ok(())
+}
+
+fn construct_tag(
+    jill_type: &ast::JillType,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) {
+    // "{module_context.module_name}.{type_name}_tag"
+    let function_name =
+        vm::VMFunctionName::construct(&module_context.module_name, &jill_type.name.0, "_tag");
+
+    // NOTE: this function is meant for internal usage,
+    // so we DO NOT add it to module scope.
+
+    let output_block = vec![
+        vm::function(function_name, 0),
+        vm::push(Segment::Argument, 0),
+        vm::pop(Segment::Pointer, 0),
+        // `tag` is always at `this 0`
+        vm::push(Segment::This, 0),
+        vm::vm_return(),
+    ];
+
+    module_context.output.add_block(output_block.into());
 }
 
 mod variant {
-    use crate::codegen::vm::{self, Segment};
+    use crate::codegen::{
+        common::helpers::function::JillFunctionReferenceExtensions,
+        context::module::FunctionContextArguments,
+        error::FallableAction,
+        vm::{self, Segment},
+    };
 
     use super::{ast, ModuleContext, ProgramContext};
 
-    use heck::ToTitleCase;
+    use heck::ToUpperCamelCase;
 
     pub(super) fn construct(
-        variant: ast::JillTypeVariant,
+        variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
-        construct_ctor(&variant, module_context, program_context);
+    ) -> FallableAction {
+        construct_ctor(variant, module_context, program_context)?;
 
         // TODO?: only generate if requested (`with get|update|eq|...`)
-        construct_accessors(&variant, module_context, program_context);
-        construct_updaters(&variant, module_context, program_context);
+        construct_accessors(variant, module_context, program_context)?;
+        construct_updaters(variant, module_context, program_context)?;
+
+        Ok(())
     }
 
     fn construct_ctor(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         let number_of_fields = number_of_fields(variant);
 
         let variant_tag = module_context.type_info.current_variant;
-        let function_name = ctor_name(variant, module_context);
+        let vm_function_name = ctor_name(variant, module_context);
 
-        let tag_index = tag_index(variant);
+        add_function_to_scope(
+            variant.name.0.clone(),
+            variant_arity(variant),
+            module_context,
+        )?;
 
-        let field_assignment =
-            |i: usize| vec![vm::push(Segment::Argument, i), vm::pop(Segment::This, i)];
+        let field_assignment = |i: usize| {
+            vec![
+                vm::push(Segment::Argument, i),
+                // offset by one because `tag` is at `this 0`
+                vm::pop(Segment::This, i + 1),
+            ]
+        };
 
         let assignments = (0..variant.fields.len())
             .flat_map(field_assignment)
@@ -69,15 +119,15 @@ mod variant {
 
         let output_block = [
             vec![
-                vm::function(function_name, 0),
+                vm::function(vm_function_name, 0),
                 vm::push(Segment::Constant, number_of_fields),
-                vm::call("Memory.alloc", 1),
+                vm::call(vm::VMFunctionName::from_literal("Memory.alloc"), 1),
                 vm::pop(Segment::Pointer, 0),
             ],
             assignments,
             vec![
                 vm::push(Segment::Constant, variant_tag),
-                vm::pop(Segment::This, tag_index),
+                vm::pop(Segment::This, 0),
                 vm::push(Segment::Pointer, 0),
                 vm::vm_return(),
             ],
@@ -85,44 +135,76 @@ mod variant {
         .concat();
 
         module_context.output.add_block(output_block.into());
+
+        Ok(())
     }
 
     fn construct_accessors(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
-            let function_name =
-                format!("{}.{}_{}", module_context.module_name, variant.name, field);
+            // "{module_context.module_name}.{variant.name}_{field}"
+            let function_reference = ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: Some(variant.name.clone()),
+                function_name: ast::JillIdentifier(field.0.clone()),
+            };
+            let vm_function_name = function_reference
+                .to_fully_qualified_hack_name(&module_context.module_name, String::new());
+
+            // function takes just object
+            let arity = 1;
+            let module_free_function_name = function_reference.type_associated_function_name();
+            add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let output_block = vec![
-                vm::function(function_name, 0),
+                vm::function(vm::VMFunctionName::from_literal(&vm_function_name), 0),
                 vm::push(Segment::Argument, 0),
                 vm::pop(Segment::Pointer, 0),
-                vm::push(Segment::This, i),
+                // offset by one because `tag` is at `this 0`
+                vm::push(Segment::This, i + 1),
                 vm::vm_return(),
             ];
 
             module_context.output.add_block(output_block.into());
         }
+
+        Ok(())
     }
 
     fn construct_updaters(
         variant: &ast::JillTypeVariant,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
-    ) {
+    ) -> FallableAction {
         let ctor_name = ctor_name(variant, module_context);
         let ctor_argument_count = variant.fields.len();
+        let ctor_call = vm::call(ctor_name, ctor_argument_count);
 
         for (variant_index, field) in variant.fields.iter().enumerate() {
-            let function_name = format!(
-                "{}.{}_update{}",
-                module_context.module_name,
-                variant.name,
-                field.0.to_title_case()
-            );
+            // let function_name = format!(
+            //     "{}.{}_update{}",
+            //     module_context.module_name,
+            //     variant.name,
+            //     field.0.to_upper_camel_case()
+            // );
+            let function_reference = ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: Some(variant.name.clone()),
+                function_name: ast::JillIdentifier(format!(
+                    "update{}",
+                    field.0.to_upper_camel_case()
+                )),
+            };
+            let vm_function_name = function_reference
+                .to_fully_qualified_hack_name(&module_context.module_name, String::new());
+
+            // object + new field value
+            let arity = 2;
+            let module_free_function_name = function_reference.type_associated_function_name();
+            add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let ctor_arg_mapping = |i| {
                 if i == variant_index {
@@ -130,7 +212,8 @@ mod variant {
                     vm::push(Segment::Argument, 1)
                 } else {
                     // other fields => push existing field value
-                    vm::push(Segment::This, i)
+                    // offset by one because `tag` is at `this 0`
+                    vm::push(Segment::This, i + 1)
                 }
             };
 
@@ -140,31 +223,52 @@ mod variant {
 
             let output_block = [
                 vec![
-                    vm::function(function_name, 0),
+                    vm::function(vm_function_name, 0),
                     vm::push(Segment::Argument, 0),
                     vm::pop(Segment::Pointer, 0),
                 ],
                 ctor_args,
-                vec![vm::call(&ctor_name, ctor_argument_count), vm::vm_return()],
+                vec![ctor_call.clone(), vm::vm_return()],
             ]
             .concat();
 
             module_context.output.add_block(output_block.into());
         }
+
+        Ok(())
     }
 
-    fn ctor_name(variant: &ast::JillTypeVariant, module_context: &ModuleContext) -> String {
-        format!("{}.{}", module_context.module_name, variant.name)
+    /// Type-related functions have no nested functions,
+    /// so we can instantly close their frame.
+    fn add_function_to_scope(
+        function_name: String,
+        arity: usize,
+        module_context: &mut ModuleContext,
+    ) -> FallableAction {
+        module_context
+            .scope
+            .enter_function(function_name, FunctionContextArguments::new(arity))?;
+
+        module_context.scope.leave_function();
+
+        Ok(())
+    }
+
+    fn ctor_name(
+        variant: &ast::JillTypeVariant,
+        module_context: &ModuleContext,
+    ) -> vm::VMFunctionName {
+        // "{module_context.module_name}.{variant.name}"
+        vm::VMFunctionName::construct(&module_context.module_name, "", &variant.name.0)
+    }
+
+    fn variant_arity(variant: &ast::JillTypeVariant) -> usize {
+        variant.fields.len()
     }
 
     fn number_of_fields(variant: &ast::JillTypeVariant) -> usize {
         // listed fields + tag
-        variant.fields.len() + 1
-    }
-
-    fn tag_index(variant: &ast::JillTypeVariant) -> usize {
-        // last item
-        number_of_fields(variant) - 1
+        variant_arity(variant) + 1
     }
 }
 
@@ -191,17 +295,25 @@ mod tests {
             }],
         }];
 
+        let tag = vec![
+            "function Bar.Bar_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
         let ctor = vec![
             "function Bar.Bar 0",
             "push constant 3",
             "call Memory.alloc 1",
             "pop pointer 0",
             "push argument 0",
-            "pop this 0",
-            "push argument 1",
             "pop this 1",
-            "push constant 0",
+            "push argument 1",
             "pop this 2",
+            "push constant 0",
+            "pop this 0",
             "push pointer 0",
             "return",
         ];
@@ -210,7 +322,7 @@ mod tests {
             "function Bar.Bar_foo1 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "return",
         ];
 
@@ -218,7 +330,7 @@ mod tests {
             "function Bar.Bar_foo2 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 1",
+            "push this 2",
             "return",
         ];
 
@@ -227,7 +339,7 @@ mod tests {
             "push argument 0",
             "pop pointer 0",
             "push argument 1",
-            "push this 1",
+            "push this 2",
             "call Bar.Bar 2",
             "return",
         ];
@@ -236,19 +348,32 @@ mod tests {
             "function Bar.Bar_updateFoo2 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "push argument 1",
             "call Bar.Bar 2",
             "return",
         ];
 
-        let expected = [ctor, get_foo1, get_foo2, update_foo1, update_foo2]
+        let expected = [tag, ctor, get_foo1, get_foo2, update_foo1, update_foo2]
             .concat()
             .join("\n");
 
-        construct(types, &mut module_context, &mut program_context);
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
 
+        // compiled instructions match expected ones
         assert_eq!(module_context.output.compile(), expected);
+
+        // function added to scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Bar_updateFoo1"))
+            .is_some());
+
+        // `tag` function NOT in scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("_tag"))
+            .is_none());
     }
 
     #[test]
@@ -272,6 +397,14 @@ mod tests {
             ],
         }];
 
+        let tag = vec![
+            "function Option.Option_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
         let none_ctor = vec![
             "function Option.None 0",
             "push constant 1",
@@ -289,9 +422,9 @@ mod tests {
             "call Memory.alloc 1",
             "pop pointer 0",
             "push argument 0",
-            "pop this 0",
-            "push constant 1",
             "pop this 1",
+            "push constant 1",
+            "pop this 0",
             "push pointer 0",
             "return",
         ];
@@ -300,7 +433,7 @@ mod tests {
             "function Option.Some_value 0",
             "push argument 0",
             "pop pointer 0",
-            "push this 0",
+            "push this 1",
             "return",
         ];
 
@@ -313,12 +446,161 @@ mod tests {
             "return",
         ];
 
-        let expected = [none_ctor, some_ctor, some_get_value, some_update_value]
+        let expected = [tag, none_ctor, some_ctor, some_get_value, some_update_value]
             .concat()
             .join("\n");
 
-        construct(types, &mut module_context, &mut program_context);
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
 
+        // compiled instructions match expected ones
+        assert_eq!(module_context.output.compile(), expected);
+
+        // function added to scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("None"))
+            .is_some());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Some_updateValue"))
+            .is_some());
+
+        // `tag` function NOT in scope
+        assert!(module_context
+            .scope
+            .search_function(&String::from("_tag"))
+            .is_none());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Option._tag"))
+            .is_none());
+
+        assert!(module_context
+            .scope
+            .search_function(&String::from("Option.tag"))
+            .is_none());
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_multiple_types() {
+        // setup
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // type Foo = Foo(value).
+        // type Bar = Baz(x).
+        let types = vec![
+            ast::JillType {
+                name: ast::JillIdentifier(String::from("Foo")),
+                variants: vec![ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("Foo")),
+                    fields: vec![ast::JillIdentifier(String::from("value"))],
+                }],
+            },
+            ast::JillType {
+                name: ast::JillIdentifier(String::from("Bar")),
+                variants: vec![ast::JillTypeVariant {
+                    name: ast::JillIdentifier(String::from("Baz")),
+                    fields: vec![ast::JillIdentifier(String::from("x"))],
+                }],
+            },
+        ];
+
+        let foo_tag = vec![
+            "function Test.Foo_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let foo_ctor = vec![
+            "function Test.Foo 0",
+            "push constant 2",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 1",
+            "push constant 0",
+            "pop this 0",
+            "push pointer 0",
+            "return",
+        ];
+
+        let foo_get_value = vec![
+            "function Test.Foo_value 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 1",
+            "return",
+        ];
+
+        let foo_update_value = vec![
+            "function Test.Foo_updateValue 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "call Test.Foo 1",
+            "return",
+        ];
+
+        let bar_tag = vec![
+            "function Test.Bar_tag 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 0",
+            "return",
+        ];
+
+        let baz_ctor = vec![
+            "function Test.Baz 0",
+            "push constant 2",
+            "call Memory.alloc 1",
+            "pop pointer 0",
+            "push argument 0",
+            "pop this 1",
+            "push constant 0",
+            "pop this 0",
+            "push pointer 0",
+            "return",
+        ];
+
+        let baz_get_x = vec![
+            "function Test.Baz_x 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push this 1",
+            "return",
+        ];
+
+        let baz_update_x = vec![
+            "function Test.Baz_updateX 0",
+            "push argument 0",
+            "pop pointer 0",
+            "push argument 1",
+            "call Test.Baz 1",
+            "return",
+        ];
+
+        let expected = [
+            foo_tag,
+            foo_ctor,
+            foo_get_value,
+            foo_update_value,
+            bar_tag,
+            baz_ctor,
+            baz_get_x,
+            baz_update_x,
+        ]
+        .concat()
+        .join("\n");
+
+        assert!(construct(types, &mut module_context, &mut program_context).is_ok());
+
+        // compiled instructions match expected ones
         assert_eq!(module_context.output.compile(), expected);
     }
 }

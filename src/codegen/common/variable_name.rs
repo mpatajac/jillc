@@ -1,8 +1,7 @@
 use crate::{
     codegen::{
-        context::{module::ScopeSearchOutcome, ModuleContext, ProgramContext},
-        error::Error,
-        vm,
+        context::{ModuleContext, ProgramContext},
+        error::{Error, FallableInstructions},
     },
     common::ast,
 };
@@ -11,22 +10,24 @@ pub fn construct(
     variable: &ast::JillIdentifier,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
-) -> Result<vm::VMInstructionBlock, Error> {
+) -> FallableInstructions {
     let variable_name = &variable.0;
 
-    let ScopeSearchOutcome::Variable(variable_context) = module_context.scope.search(variable_name)
-    else {
+    let Some(variable_context) = module_context.scope.search_variable(variable_name) else {
         return Err(Error::VariableNotInScope(variable_name.clone()));
     };
 
-    let instructions = vec![vm::push(variable_context.segment, variable_context.index)].into();
+    let instructions = variable_context.push();
 
     Ok(instructions)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::context::module::{FunctionContext, VariableContext};
+    use crate::codegen::{
+        context::module::{FunctionContextArguments, VariableContextArguments},
+        vm,
+    };
 
     use super::*;
 
@@ -37,24 +38,14 @@ mod tests {
 
         assert!(module_context
             .scope
-            .add_function(
-                "foo".to_string(),
-                FunctionContext {
-                    number_of_arguments: 1,
-                },
-            )
+            .enter_function("foo".to_string(), FunctionContextArguments::new(1))
             .is_ok());
-
-        module_context.scope.add_frame();
 
         assert!(module_context
             .scope
             .add_variable(
                 "a".to_string(),
-                VariableContext {
-                    segment: vm::Segment::Argument,
-                    index: 0
-                },
+                VariableContextArguments::new(vm::Segment::Argument),
             )
             .is_ok());
 
@@ -65,7 +56,10 @@ mod tests {
             &mut module_context,
             &mut program_context
         )
-        .is_ok_and(|instructions| instructions.compile() == expected_instructions));
+        .is_ok_and(
+            |instructions| vm::VMInstructionBlock::from(instructions).compile()
+                == expected_instructions
+        ));
     }
 
     #[test]
