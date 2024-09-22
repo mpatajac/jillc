@@ -49,6 +49,14 @@ pub fn construct(
         )?;
     }
 
+    // register captures in scope
+    for capture in &function.captures {
+        module_context.scope.add_variable(
+            capture.0.clone(),
+            VariableContextArguments::new(vm::Segment::Capture(arity)),
+        )?;
+    }
+
     let function_reference = ast::JillFunctionReference::from_function_definition(function);
 
     let vm_function_name = function_reference
