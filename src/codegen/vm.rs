@@ -230,7 +230,10 @@ pub enum LabelAction {
     IfGoto,
 }
 
-#[derive(Debug, strum::Display, Clone, Copy, PartialEq, Eq, Hash, strum::VariantArray)]
+/// How many arguments are there before the "captures" array
+pub type CapturesArrayArgumentNumber = usize;
+
+#[derive(Debug, strum::Display, Clone, Copy, PartialEq, Eq, Hash)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Segment {
     Local,
@@ -241,6 +244,8 @@ pub enum Segment {
     That,
     Pointer,
     Temp,
+    // NOTE: not a proper VM segment; used internally to work with captures (array)
+    Capture(CapturesArrayArgumentNumber),
 }
 
 // endregion

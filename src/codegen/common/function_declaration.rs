@@ -49,6 +49,14 @@ pub fn construct(
         )?;
     }
 
+    // register captures in scope
+    for capture in &function.captures {
+        module_context.scope.add_variable(
+            capture.0.clone(),
+            VariableContextArguments::new(vm::Segment::Capture(arity)),
+        )?;
+    }
+
     let function_reference = ast::JillFunctionReference::from_function_definition(function);
 
     let vm_function_name = function_reference
@@ -232,6 +240,7 @@ mod tail_recursion {
             self,
             function_call: &ast::JillFunctionCall,
             _: Option<LocalCallInfo>,
+            _: bool,
         ) -> Vec<vm::VMInstruction> {
             let argument_reset_instructions = (0..function_call.arguments.len())
                 // argument values are "stacked" in order, so we need to pop them backwards

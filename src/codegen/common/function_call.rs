@@ -63,7 +63,7 @@ pub fn construct(
     }
 }
 
-fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstructions {
+fn invalid_function_call<T>(function_call: &ast::JillFunctionCall) -> Result<T, Error> {
     Err(Error::InvalidFunctionCall(
         function_call.reference.reconstruct_source_name(),
     ))
@@ -161,11 +161,20 @@ mod variable_call {
             array_instructions_build_config,
         )?;
 
+        let function_arity = function_call.arguments.len();
+
         let call_instructions = vec![
+            // closure
             variable_context.push(),
-            vm::push(vm::Segment::Temp, array_temp_segment_index),
-            vm::call(vm::VMFunctionName::from_literal("Fn._call"), 2),
-        ];
+            vec![
+                // arity
+                vm::push(vm::Segment::Constant, function_arity),
+                // arguments
+                vm::push(vm::Segment::Temp, array_temp_segment_index),
+                vm::call(vm::VMFunctionName::from_literal("Fn._call"), 3),
+            ],
+        ]
+        .concat();
 
         // array
         program_context.temp_segment_index.release();
@@ -181,11 +190,12 @@ pub(super) mod direct_call {
         common::{
             expression,
             helpers::{
-                function::JillFunctionReferenceExtensions, function_override::FunctionOverrideKind,
+                self, function::JillFunctionReferenceExtensions,
+                function_override::FunctionOverrideKind,
             },
         },
         context::module::FunctionContext,
-        error::FallableInstructions,
+        error::{FallableAction, FallableInstructions},
         jillstd, vm,
     };
 
@@ -196,7 +206,14 @@ pub(super) mod direct_call {
             self,
             function_call: &ast::JillFunctionCall,
             local_call_info: Option<LocalCallInfo>,
+            has_captures: bool,
         ) -> Vec<vm::VMInstruction>;
+    }
+
+    #[derive(Debug, Default, Clone)]
+    pub struct LocalCallInfo {
+        module_name: String,
+        prefix: String,
     }
 
     #[derive(Debug)]
@@ -207,16 +224,22 @@ pub(super) mod direct_call {
             self,
             function_call: &ast::JillFunctionCall,
             local_call_info: Option<LocalCallInfo>,
+            has_captures: bool,
         ) -> Vec<vm::VMInstruction> {
+            // increase argument count by one if there are captures (for capture array)
+            let argument_count = function_call.arguments.len() + (has_captures as usize);
+
             vec![vm::call(
                 function_call.reference.to_fully_qualified_hack_name(
                     &local_call_info.clone().unwrap_or_default().module_name,
                     local_call_info.unwrap_or_default().prefix,
                 ),
-                function_call.arguments.len(),
+                argument_count,
             )]
         }
     }
+
+    // region: Module-foreign
 
     pub(super) fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
@@ -224,25 +247,44 @@ pub(super) mod direct_call {
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
         // track (potential) `JillStd` function occurences
+        note_potential_std_function_occurence(function_call, program_context)?;
+
+        // call construction
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
+        // NOTE: module-foreign call cannot be recursive,
+        // so we can hardcode call construction
+        let call = NormalCallConstruction.construct(
+            function_call,
+            None,
+            // module-foreign call can only be to a top-level function, and they cannot have captures
+            false,
+        );
+
+        Ok([argument_instructions, call].concat())
+    }
+
+    fn note_potential_std_function_occurence(
+        function_call: &ast::JillFunctionCall,
+        program_context: &mut ProgramContext,
+    ) -> FallableAction {
         let std_function_usage_note_outcome = program_context
             .std_usage_tracker
             .note_usage(&function_call.reference);
+
         if std_function_usage_note_outcome
             == jillstd::JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule
         {
             return invalid_function_call(function_call);
         }
 
-        construct(
-            function_call,
-            None,
-            // NOTE: module-foreign call cannot be recursive,
-            // so we can hardcode call construction
-            NormalCallConstruction,
-            module_context,
-            program_context,
-        )
+        Ok(())
     }
+
+    // endregion
+
+    // region: Module-local
 
     pub fn construct_module_local(
         function_call: &ast::JillFunctionCall,
@@ -251,68 +293,38 @@ pub(super) mod direct_call {
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
+        // only evaluate (and push) captures array if there are any
+        let called_function_has_captures = !function_context.captures.is_empty();
+        let captures_instructions = if called_function_has_captures {
+            helpers::capture::construct_captures_array(
+                &function_context.captures,
+                module_context,
+                program_context,
+            )?
+        } else {
+            Vec::new()
+        };
+
         let local_call_info = LocalCallInfo {
             module_name: module_context.module_name.clone(),
             prefix: function_context.prefix,
         };
 
-        construct(
+        let call = call_construction.construct(
             function_call,
             Some(local_call_info),
-            call_construction,
-            module_context,
-            program_context,
-        )
+            called_function_has_captures,
+        );
+
+        Ok([argument_instructions, captures_instructions, call].concat())
     }
 
-    #[derive(Debug, Default, Clone)]
-    pub struct LocalCallInfo {
-        module_name: String,
-        prefix: String,
-    }
+    // endregion
 
-    fn construct(
-        function_call: &ast::JillFunctionCall,
-        local_call_info: Option<LocalCallInfo>,
-        call_construction: impl CallConstruction,
-        module_context: &mut ModuleContext,
-        program_context: &mut ProgramContext,
-    ) -> FallableInstructions {
-        let argument_instructions = function_call
-            .arguments
-            .iter()
-            .map(|expr| expression::construct(expr, module_context, program_context))
-            .collect::<Result<Vec<_>, _>>()?
-            .concat();
-
-        let call = call_construction.construct(function_call, local_call_info);
-
-        Ok([argument_instructions, call].concat())
-    }
-
-    #[derive(Debug)]
-    struct OverrideCallConstruction(FunctionOverrideKind);
-
-    impl CallConstruction for OverrideCallConstruction {
-        fn construct(
-            self,
-            function_call: &ast::JillFunctionCall,
-            _: Option<LocalCallInfo>,
-        ) -> Vec<vm::VMInstruction> {
-            let instruction = match self.0 {
-                FunctionOverrideKind::VM(vm_command) => vm::command(vm_command),
-                FunctionOverrideKind::JackStd(module_name, function_name) => {
-                    // Jack std has no type-associated functions
-                    let vm_function_name =
-                        vm::VMFunctionName::construct(module_name, "", function_name);
-
-                    vm::call(vm_function_name, function_call.arguments.len())
-                }
-            };
-
-            vec![instruction]
-        }
-    }
+    // region: Override
 
     pub(super) fn construct_override(
         function_call: &ast::JillFunctionCall,
@@ -322,13 +334,45 @@ pub(super) mod direct_call {
     ) -> FallableInstructions {
         // no need to track (potential) `JillStd` function occurences
 
-        construct(
-            function_call,
-            None,
-            OverrideCallConstruction(override_kind),
-            module_context,
-            program_context,
-        )
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
+        let call = construct_override_call(function_call, override_kind);
+
+        Ok([argument_instructions, call].concat())
+    }
+
+    fn construct_override_call(
+        function_call: &ast::JillFunctionCall,
+        override_kind: FunctionOverrideKind,
+    ) -> Vec<vm::VMInstruction> {
+        let instruction = match override_kind {
+            FunctionOverrideKind::VM(vm_command) => vm::command(vm_command),
+            FunctionOverrideKind::JackStd(module_name, function_name) => {
+                // Jack std has no type-associated functions
+                let vm_function_name =
+                    vm::VMFunctionName::construct(module_name, "", function_name);
+
+                vm::call(vm_function_name, function_call.arguments.len())
+            }
+        };
+
+        vec![instruction]
+    }
+
+    // endregion
+
+    fn construct_arguments(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        Ok(function_call
+            .arguments
+            .iter()
+            .map(|expr| expression::construct(expr, module_context, program_context))
+            .collect::<Result<Vec<_>, _>>()?
+            .concat())
     }
 }
 
@@ -518,6 +562,78 @@ mod tests {
     }
 
     #[test]
+    fn test_module_local_with_captures() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // fn bar x = _.
+        assert!(module_context
+            .scope
+            .enter_function(String::from("bar"), FunctionContextArguments::new(1))
+            .is_ok());
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("x"),
+                VariableContextArguments::new(vm::Segment::Argument)
+            )
+            .is_ok());
+
+        // fn baz a [x] = _.
+        assert!(module_context
+            .scope
+            .enter_function(
+                String::from("baz"),
+                FunctionContextArguments::new(1).with_captures(vec![String::from("x")])
+            )
+            .is_ok());
+
+        module_context.scope.leave_function();
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("baz")),
+        };
+        let arguments = vec![ast::JillExpression::Literal(ast::JillLiteral::Integer(5))];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            // argument
+            "push constant 5",
+            // captures
+            // create array
+            "push constant 1",
+            "call Array.new 1",
+            "pop temp 1",
+            // add `x`
+            "push constant 0",
+            "push temp 1",
+            "add",
+            "push argument 0",
+            "pop temp 0",
+            "pop pointer 1",
+            "push temp 0",
+            "pop that 0",
+            // push to stack
+            "push temp 1",
+            // call
+            "call Test.bar_baz 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
     fn test_variable_call() {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new(String::from("Test"));
@@ -570,8 +686,9 @@ mod tests {
             "pop that 0",
             // call
             "push local 0",
+            "push constant 2",
             "push temp 1",
-            "call Fn._call 2",
+            "call Fn._call 3",
         ]
         .join("\n");
 

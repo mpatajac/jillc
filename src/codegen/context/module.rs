@@ -286,13 +286,29 @@ pub struct VariableContext {
 impl VariableContext {
     /// Helper function for performing a `push`
     /// action with the variable's segment and index.
-    pub fn push(&self) -> vm::VMInstruction {
-        vm::push(self.segment, self.index)
+    pub fn push(&self) -> Vec<vm::VMInstruction> {
+        match self.segment {
+            // since `Capture` is not a proper VM segment, we need to do some extra work
+            vm::Segment::Capture(array_index) => {
+                vec![
+                    vm::push(vm::Segment::Constant, self.index),
+                    vm::push(vm::Segment::Argument, array_index),
+                    vm::command(vm::VMCommand::Add),
+                    vm::pop(vm::Segment::Pointer, 1),
+                    vm::push(vm::Segment::That, 0),
+                ]
+            }
+            segment => vec![vm::push(segment, self.index)],
+        }
     }
 
     /// Helper function for performing a `pop`
     /// action with the variable's segment and index.
     pub fn pop(&self) -> vm::VMInstruction {
+        if matches!(self.segment, vm::Segment::Capture(_)) {
+            panic!("called `pop` on a `capture` variable context");
+        }
+
         vm::pop(self.segment, self.index)
     }
 }

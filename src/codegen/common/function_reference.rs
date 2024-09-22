@@ -47,8 +47,11 @@ pub fn construct(
 
     // collect function captures (if any are present)
     let function_captures = function_context.map_or(Vec::new(), |ctx| ctx.captures);
-    let captures_instructions =
-        construct_captures_array(&function_captures, module_context, program_context)?;
+    let captures_instructions = helpers::capture::construct_captures_array(
+        &function_captures,
+        module_context,
+        program_context,
+    )?;
 
     let instructions = [
         vec![vm::push(vm::Segment::Constant, function_id)],
@@ -67,41 +70,6 @@ fn is_valid_function_reference(
     function_context: &Option<FunctionContext>,
 ) -> bool {
     function_reference.is_fully_qualified() || function_context.is_some()
-}
-
-fn construct_captures_array(
-    function_captures: &Vec<String>,
-    module_context: &ModuleContext,
-    program_context: &mut ProgramContext,
-) -> FallableInstructions {
-    let array_instructions_build_config = helpers::array::ArrayBuildConfiguration {
-        push_resulting_array: true,
-        // don't need `temp` segment values here, so we can just inline them
-        array_elem_temp_segment_index: program_context.temp_segment_index.request(),
-        array_temp_segment_index: program_context.temp_segment_index.request(),
-    };
-
-    // have to evaluate before releasing `temp` indices
-    let array_build_instructions = helpers::array::build_array_instructions(
-        function_captures,
-        |capture_name| {
-            module_context
-                .scope
-                .search_variable(capture_name)
-                .map_or_else(
-                    || Err(Error::CaptureNotInScope(capture_name.to_string())),
-                    |capture_variable_context| Ok(vec![capture_variable_context.push()]),
-                )
-        },
-        array_instructions_build_config,
-    );
-
-    // array
-    program_context.temp_segment_index.release();
-    // array elem storage
-    program_context.temp_segment_index.release();
-
-    array_build_instructions
 }
 
 fn invalid_function_reference(
