@@ -166,12 +166,15 @@ mod variable_call {
         let call_instructions = vec![
             // closure
             variable_context.push(),
-            // arity
-            vm::push(vm::Segment::Constant, function_arity),
-            // arguments
-            vm::push(vm::Segment::Temp, array_temp_segment_index),
-            vm::call(vm::VMFunctionName::from_literal("Fn._call"), 3),
-        ];
+            vec![
+                // arity
+                vm::push(vm::Segment::Constant, function_arity),
+                // arguments
+                vm::push(vm::Segment::Temp, array_temp_segment_index),
+                vm::call(vm::VMFunctionName::from_literal("Fn._call"), 3),
+            ],
+        ]
+        .concat();
 
         // array
         program_context.temp_segment_index.release();

@@ -352,10 +352,13 @@ fn construct_match(
             [
                 // if tag equals current variant, go to corresponding expression
                 tag_storage.push(),
-                vm::push(vm::Segment::Constant, i),
-                vm::command(vm::VMCommand::Eq),
-                vm::label(vm::LabelAction::IfGoto, &variant_labels[i]),
+                vec![
+                    vm::push(vm::Segment::Constant, i),
+                    vm::command(vm::VMCommand::Eq),
+                    vm::label(vm::LabelAction::IfGoto, &variant_labels[i]),
+                ],
             ]
+            .concat()
         })
         .collect::<Vec<_>>()
         .concat();

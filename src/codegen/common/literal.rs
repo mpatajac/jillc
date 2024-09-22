@@ -91,12 +91,10 @@ fn construct_list(
                 vec![temp_storage.pop()],
                 // evaluate next elem
                 super::expression::construct(elem, module_context, program_context)?,
-                vec![
-                    // re-push previous result (to maintain proper element order)
-                    temp_storage.push(),
-                    // construct new list "head"
-                    vm::call(vm::VMFunctionName::from_literal("List.List"), 2),
-                ],
+                // re-push previous result (to maintain proper element order)
+                temp_storage.push(),
+                // construct new list "head"
+                vec![vm::call(vm::VMFunctionName::from_literal("List.List"), 2)],
             ]
             .concat())
         })

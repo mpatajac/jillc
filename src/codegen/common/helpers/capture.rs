@@ -24,7 +24,7 @@ pub fn construct_captures_array(
                 .search_variable(capture_name)
                 .map_or_else(
                     || Err(Error::CaptureNotInScope(capture_name.to_string())),
-                    |capture_variable_context| Ok(vec![capture_variable_context.push()]),
+                    |capture_variable_context| Ok(capture_variable_context.push()),
                 )
         },
         array_instructions_build_config,

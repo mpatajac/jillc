@@ -41,18 +41,16 @@ where
         .enumerate()
         .map(|(index, item)| {
             Ok([
-                vec![
-                    vm::push(vm::Segment::Constant, index),
-                    array.push(),
-                    vm::command(vm::VMCommand::Add),
-                ],
+                vec![vm::push(vm::Segment::Constant, index)],
+                array.push(),
+                vec![vm::command(vm::VMCommand::Add)],
                 item_instructions(item)?,
                 vec![
                     array_elem_temp_storage.pop(),
                     vm::pop(vm::Segment::Pointer, 1),
-                    array_elem_temp_storage.push(),
-                    vm::pop(vm::Segment::That, 0),
                 ],
+                array_elem_temp_storage.push(),
+                vec![vm::pop(vm::Segment::That, 0)],
             ]
             .concat())
         })
@@ -62,7 +60,7 @@ where
     let mut instructions = vec![array_init_instructions, array_items_instructions];
 
     if build_configuration.push_resulting_array {
-        instructions.push(vec![array.push()]);
+        instructions.push(array.push());
     }
 
     Ok(instructions.concat())
