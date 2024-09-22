@@ -576,8 +576,9 @@ mod tests {
             "pop that 0",
             // call
             "push local 0",
+            "push constant 2",
             "push temp 1",
-            "call Fn._call 2",
+            "call Fn._call 3",
         ]
         .join("\n");
 
