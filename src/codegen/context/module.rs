@@ -48,13 +48,6 @@ pub struct Scope {
     frames: Vec<ScopeFrame>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ScopeSearchOutcome {
-    NotFound,
-    Variable,
-    Function,
-}
-
 type Name = String;
 type ModuleFreeName = String;
 
@@ -80,27 +73,28 @@ impl Scope {
         context_arguments: FunctionContextArguments,
     ) -> Result<FunctionContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
-        match self.search(&name) {
-            ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
-            ScopeSearchOutcome::NotFound => {
-                let context = FunctionContext {
-                    arity: context_arguments.arity,
-                    prefix: self.construct_function_prefix(),
-                    captures: context_arguments.captures.unwrap_or_default(),
-                };
-
-                // add to list of existing functions
-                self.last_mut_frame()
-                    .functions
-                    .insert(name.clone(), context.clone());
-
-                // create a frame for the new function
-                self.frames.push(ScopeFrame::new(name));
-
-                Ok(context)
-            }
+        if self.search_variable(&name).is_some() {
+            return Err(Error::VariableAlreadyInScope(name));
         }
+        if self.search_function(&name).is_some() {
+            return Err(Error::FunctionAlreadyInScope(name));
+        }
+
+        let context = FunctionContext {
+            arity: context_arguments.arity,
+            prefix: self.construct_function_prefix(),
+            captures: context_arguments.captures.unwrap_or_default(),
+        };
+
+        // add to list of existing functions
+        self.last_mut_frame()
+            .functions
+            .insert(name.clone(), context.clone());
+
+        // create a frame for the new function
+        self.frames.push(ScopeFrame::new(name));
+
+        Ok(context)
     }
 
     /// Denote that a function definition is ending and that
@@ -120,27 +114,28 @@ impl Scope {
         context_arguments: VariableContextArguments,
     ) -> Result<VariableContext, Error> {
         // check for existing functions/variables with the same name (to prevent shadowing)
-        match self.search(&name) {
-            ScopeSearchOutcome::Variable => Err(Error::VariableAlreadyInScope(name)),
-            ScopeSearchOutcome::Function => Err(Error::FunctionAlreadyInScope(name)),
-            ScopeSearchOutcome::NotFound => {
-                let segment_index = self
-                    .last_mut_frame()
-                    .variable_segment_indices
-                    .add_variable(context_arguments.segment);
-
-                let context = VariableContext {
-                    segment: context_arguments.segment,
-                    index: segment_index,
-                };
-
-                self.last_mut_frame()
-                    .variables
-                    .insert(name, context.clone());
-
-                Ok(context)
-            }
+        if self.search_variable(&name).is_some() {
+            return Err(Error::VariableAlreadyInScope(name));
         }
+        if self.search_function(&name).is_some() {
+            return Err(Error::FunctionAlreadyInScope(name));
+        }
+
+        let segment_index = self
+            .last_mut_frame()
+            .variable_segment_indices
+            .add_variable(context_arguments.segment);
+
+        let context = VariableContext {
+            segment: context_arguments.segment,
+            index: segment_index,
+        };
+
+        self.last_mut_frame()
+            .variables
+            .insert(name, context.clone());
+
+        Ok(context)
     }
 
     /// Search through the scope frames for a function with
@@ -204,27 +199,6 @@ impl Scope {
         self.frames
             .last_mut()
             .expect("scope shoule at least have the module-level frame")
-    }
-
-    /// Search through the scope frames for a variable
-    /// or a function with a given identifier,
-    /// returning its context upon a successful search.
-    ///
-    /// Used internally to prevent name shadowing.
-    fn search(&self, identifier: &Name) -> ScopeSearchOutcome {
-        // search from latest (last) to oldest (first)
-        for frame in self.frames.iter().rev() {
-            // variables have priority
-            if frame.variables.contains_key(identifier) {
-                return ScopeSearchOutcome::Variable;
-            }
-
-            if frame.functions.contains_key(identifier) {
-                return ScopeSearchOutcome::Function;
-            }
-        }
-
-        ScopeSearchOutcome::NotFound
     }
 
     /// Gets current label index and increases it for future usage.
