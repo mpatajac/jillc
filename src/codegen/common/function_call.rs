@@ -63,7 +63,7 @@ pub fn construct(
     }
 }
 
-fn invalid_function_call(function_call: &ast::JillFunctionCall) -> FallableInstructions {
+fn invalid_function_call<T>(function_call: &ast::JillFunctionCall) -> Result<T, Error> {
     Err(Error::InvalidFunctionCall(
         function_call.reference.reconstruct_source_name(),
     ))
@@ -191,7 +191,7 @@ pub(super) mod direct_call {
             },
         },
         context::module::FunctionContext,
-        error::FallableInstructions,
+        error::{FallableAction, FallableInstructions},
         jillstd, vm,
     };
 
@@ -230,20 +230,15 @@ pub(super) mod direct_call {
         }
     }
 
+    // region: Module-foreign
+
     pub(super) fn construct_module_foreign(
         function_call: &ast::JillFunctionCall,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
         // track (potential) `JillStd` function occurences
-        let std_function_usage_note_outcome = program_context
-            .std_usage_tracker
-            .note_usage(&function_call.reference);
-        if std_function_usage_note_outcome
-            == jillstd::JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule
-        {
-            return invalid_function_call(function_call);
-        }
+        note_potential_std_function_occurence(function_call, program_context)?;
 
         // call construction
         let argument_instructions =
@@ -255,6 +250,27 @@ pub(super) mod direct_call {
 
         Ok([argument_instructions, call].concat())
     }
+
+    fn note_potential_std_function_occurence(
+        function_call: &ast::JillFunctionCall,
+        program_context: &mut ProgramContext,
+    ) -> FallableAction {
+        let std_function_usage_note_outcome = program_context
+            .std_usage_tracker
+            .note_usage(&function_call.reference);
+
+        if std_function_usage_note_outcome
+            == jillstd::JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule
+        {
+            return invalid_function_call(function_call);
+        }
+
+        Ok(())
+    }
+
+    // endregion
+
+    // region: Module-local
 
     pub fn construct_module_local(
         function_call: &ast::JillFunctionCall,
@@ -275,6 +291,10 @@ pub(super) mod direct_call {
 
         Ok([argument_instructions, call].concat())
     }
+
+    // endregion
+
+    // region: Override
 
     pub(super) fn construct_override(
         function_call: &ast::JillFunctionCall,
@@ -309,6 +329,8 @@ pub(super) mod direct_call {
 
         vec![instruction]
     }
+
+    // endregion
 
     fn construct_arguments(
         function_call: &ast::JillFunctionCall,
