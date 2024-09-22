@@ -161,10 +161,16 @@ mod variable_call {
             array_instructions_build_config,
         )?;
 
+        let function_arity = function_call.arguments.len();
+
         let call_instructions = vec![
+            // closure
             variable_context.push(),
+            // arity
+            vm::push(vm::Segment::Constant, function_arity),
+            // arguments
             vm::push(vm::Segment::Temp, array_temp_segment_index),
-            vm::call(vm::VMFunctionName::from_literal("Fn._call"), 2),
+            vm::call(vm::VMFunctionName::from_literal("Fn._call"), 3),
         ];
 
         // array
