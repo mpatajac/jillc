@@ -205,6 +205,12 @@ pub(super) mod direct_call {
         ) -> Vec<vm::VMInstruction>;
     }
 
+    #[derive(Debug, Default, Clone)]
+    pub struct LocalCallInfo {
+        module_name: String,
+        prefix: String,
+    }
+
     #[derive(Debug)]
     pub struct NormalCallConstruction;
 
@@ -239,15 +245,15 @@ pub(super) mod direct_call {
             return invalid_function_call(function_call);
         }
 
-        construct(
-            function_call,
-            None,
-            // NOTE: module-foreign call cannot be recursive,
-            // so we can hardcode call construction
-            NormalCallConstruction,
-            module_context,
-            program_context,
-        )
+        // call construction
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
+        // NOTE: module-foreign call cannot be recursive,
+        // so we can hardcode call construction
+        let call = NormalCallConstruction.construct(function_call, None);
+
+        Ok([argument_instructions, call].concat())
     }
 
     pub fn construct_module_local(
@@ -257,67 +263,17 @@ pub(super) mod direct_call {
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
         let local_call_info = LocalCallInfo {
             module_name: module_context.module_name.clone(),
             prefix: function_context.prefix,
         };
 
-        construct(
-            function_call,
-            Some(local_call_info),
-            call_construction,
-            module_context,
-            program_context,
-        )
-    }
-
-    #[derive(Debug, Default, Clone)]
-    pub struct LocalCallInfo {
-        module_name: String,
-        prefix: String,
-    }
-
-    fn construct(
-        function_call: &ast::JillFunctionCall,
-        local_call_info: Option<LocalCallInfo>,
-        call_construction: impl CallConstruction,
-        module_context: &mut ModuleContext,
-        program_context: &mut ProgramContext,
-    ) -> FallableInstructions {
-        let argument_instructions = function_call
-            .arguments
-            .iter()
-            .map(|expr| expression::construct(expr, module_context, program_context))
-            .collect::<Result<Vec<_>, _>>()?
-            .concat();
-
-        let call = call_construction.construct(function_call, local_call_info);
+        let call = call_construction.construct(function_call, Some(local_call_info));
 
         Ok([argument_instructions, call].concat())
-    }
-
-    #[derive(Debug)]
-    struct OverrideCallConstruction(FunctionOverrideKind);
-
-    impl CallConstruction for OverrideCallConstruction {
-        fn construct(
-            self,
-            function_call: &ast::JillFunctionCall,
-            _: Option<LocalCallInfo>,
-        ) -> Vec<vm::VMInstruction> {
-            let instruction = match self.0 {
-                FunctionOverrideKind::VM(vm_command) => vm::command(vm_command),
-                FunctionOverrideKind::JackStd(module_name, function_name) => {
-                    // Jack std has no type-associated functions
-                    let vm_function_name =
-                        vm::VMFunctionName::construct(module_name, "", function_name);
-
-                    vm::call(vm_function_name, function_call.arguments.len())
-                }
-            };
-
-            vec![instruction]
-        }
     }
 
     pub(super) fn construct_override(
@@ -328,13 +284,43 @@ pub(super) mod direct_call {
     ) -> FallableInstructions {
         // no need to track (potential) `JillStd` function occurences
 
-        construct(
-            function_call,
-            None,
-            OverrideCallConstruction(override_kind),
-            module_context,
-            program_context,
-        )
+        let argument_instructions =
+            construct_arguments(function_call, module_context, program_context)?;
+
+        let call = construct_override_call(function_call, override_kind);
+
+        Ok([argument_instructions, call].concat())
+    }
+
+    fn construct_override_call(
+        function_call: &ast::JillFunctionCall,
+        override_kind: FunctionOverrideKind,
+    ) -> Vec<vm::VMInstruction> {
+        let instruction = match override_kind {
+            FunctionOverrideKind::VM(vm_command) => vm::command(vm_command),
+            FunctionOverrideKind::JackStd(module_name, function_name) => {
+                // Jack std has no type-associated functions
+                let vm_function_name =
+                    vm::VMFunctionName::construct(module_name, "", function_name);
+
+                vm::call(vm_function_name, function_call.arguments.len())
+            }
+        };
+
+        vec![instruction]
+    }
+
+    fn construct_arguments(
+        function_call: &ast::JillFunctionCall,
+        module_context: &mut ModuleContext,
+        program_context: &mut ProgramContext,
+    ) -> FallableInstructions {
+        Ok(function_call
+            .arguments
+            .iter()
+            .map(|expr| expression::construct(expr, module_context, program_context))
+            .collect::<Result<Vec<_>, _>>()?
+            .concat())
     }
 }
 
