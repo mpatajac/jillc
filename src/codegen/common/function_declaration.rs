@@ -232,6 +232,7 @@ mod tail_recursion {
             self,
             function_call: &ast::JillFunctionCall,
             _: Option<LocalCallInfo>,
+            _: bool,
         ) -> Vec<vm::VMInstruction> {
             let argument_reset_instructions = (0..function_call.arguments.len())
                 // argument values are "stacked" in order, so we need to pop them backwards

@@ -202,6 +202,7 @@ pub(super) mod direct_call {
             self,
             function_call: &ast::JillFunctionCall,
             local_call_info: Option<LocalCallInfo>,
+            has_captures: bool,
         ) -> Vec<vm::VMInstruction>;
     }
 
@@ -219,13 +220,17 @@ pub(super) mod direct_call {
             self,
             function_call: &ast::JillFunctionCall,
             local_call_info: Option<LocalCallInfo>,
+            has_captures: bool,
         ) -> Vec<vm::VMInstruction> {
+            // increase argument count by one if there are captures (for capture array)
+            let argument_count = function_call.arguments.len() + (has_captures as usize);
+
             vec![vm::call(
                 function_call.reference.to_fully_qualified_hack_name(
                     &local_call_info.clone().unwrap_or_default().module_name,
                     local_call_info.unwrap_or_default().prefix,
                 ),
-                function_call.arguments.len(),
+                argument_count,
             )]
         }
     }
@@ -246,7 +251,12 @@ pub(super) mod direct_call {
 
         // NOTE: module-foreign call cannot be recursive,
         // so we can hardcode call construction
-        let call = NormalCallConstruction.construct(function_call, None);
+        let call = NormalCallConstruction.construct(
+            function_call,
+            None,
+            // module-foreign call can only be to a top-level function, and they cannot have captures
+            false,
+        );
 
         Ok([argument_instructions, call].concat())
     }
