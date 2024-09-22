@@ -37,6 +37,10 @@ enum JillStdMath {
     Inc,
     /// `--`
     Dec,
+    // Jack std name matches
+    Min,
+    Max,
+    Sqrt,
 }
 
 /// List of functions available inside Jill-specific `Bool` standard module.
@@ -175,13 +179,7 @@ impl JillStdUsageTracker {
         };
 
         // check that the function reference function name is one of ones in the module
-        let associated_type = function_reference
-            .associated_type
-            .clone()
-            .map(|t| format!("{t}_"))
-            .unwrap_or_default();
-
-        let function_name = associated_type + &function_reference.function_name.0;
+        let function_name = function_reference.type_associated_function_name();
         let Some(function_used) = module_functions.get_mut(function_name.as_str()) else {
             return JillStdFunctionUsageNoteOutcome::FunctionNotPresentInModule;
         };

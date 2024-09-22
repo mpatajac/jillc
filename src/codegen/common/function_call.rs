@@ -118,7 +118,7 @@ pub(super) fn determine_function_call_kind(
     // so we can use context for name prefix
     if let Some(function_context) = module_context
         .scope
-        .search_function(&function_reference.function_name.0)
+        .search_function(&function_reference.type_associated_function_name())
     {
         return FunctionCallKind::ModuleLocalFunction(function_context);
     }

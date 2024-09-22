@@ -65,6 +65,7 @@ fn construct_tag(
 
 mod variant {
     use crate::codegen::{
+        common::helpers::function::JillFunctionReferenceExtensions,
         context::module::FunctionContextArguments,
         error::FallableAction,
         vm::{self, Segment},
@@ -72,7 +73,7 @@ mod variant {
 
     use super::{ast, ModuleContext, ProgramContext};
 
-    use heck::ToTitleCase;
+    use heck::ToUpperCamelCase;
 
     pub(super) fn construct(
         variant: &ast::JillTypeVariant,
@@ -145,15 +146,17 @@ mod variant {
     ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
             // "{module_context.module_name}.{variant.name}_{field}"
-            let vm_function_name = vm::VMFunctionName::construct(
-                &module_context.module_name,
-                &format!("{}_", variant.name),
-                &field.0,
-            );
+            let function_reference = ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: Some(variant.name.clone()),
+                function_name: ast::JillIdentifier(field.0.clone()),
+            };
+            let vm_function_name = function_reference
+                .to_fully_qualified_hack_name(&module_context.module_name, String::new());
 
             // function takes just object
             let arity = 1;
-            let module_free_function_name = format!("{}_{}", variant.name, field.0);
+            let module_free_function_name = function_reference.type_associated_function_name();
             add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let output_block = vec![
@@ -185,18 +188,22 @@ mod variant {
             //     "{}.{}_update{}",
             //     module_context.module_name,
             //     variant.name,
-            //     field.0.to_title_case()
+            //     field.0.to_upper_camel_case()
             // );
-            let vm_function_name = vm::VMFunctionName::construct(
-                &module_context.module_name,
-                &format!("{}_", variant.name),
-                &format!("update{}", field.0.to_title_case()),
-            );
+            let function_reference = ast::JillFunctionReference {
+                modules_path: vec![],
+                associated_type: Some(variant.name.clone()),
+                function_name: ast::JillIdentifier(format!(
+                    "update{}",
+                    field.0.to_upper_camel_case()
+                )),
+            };
+            let vm_function_name = function_reference
+                .to_fully_qualified_hack_name(&module_context.module_name, String::new());
 
             // object + new field value
             let arity = 2;
-            let module_free_function_name =
-                format!("{}_update{}", variant.name, field.0.to_title_case());
+            let module_free_function_name = function_reference.type_associated_function_name();
             add_function_to_scope(module_free_function_name, arity, module_context)?;
 
             let ctor_arg_mapping = |i| {
