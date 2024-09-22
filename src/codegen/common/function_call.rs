@@ -187,7 +187,8 @@ pub(super) mod direct_call {
         common::{
             expression,
             helpers::{
-                function::JillFunctionReferenceExtensions, function_override::FunctionOverrideKind,
+                self, function::JillFunctionReferenceExtensions,
+                function_override::FunctionOverrideKind,
             },
         },
         context::module::FunctionContext,
@@ -292,14 +293,30 @@ pub(super) mod direct_call {
         let argument_instructions =
             construct_arguments(function_call, module_context, program_context)?;
 
+        // only evaluate (and push) captures array if there are any
+        let called_function_has_captures = !function_context.captures.is_empty();
+        let captures_instructions = if called_function_has_captures {
+            helpers::capture::construct_captures_array(
+                &function_context.captures,
+                module_context,
+                program_context,
+            )?
+        } else {
+            Vec::new()
+        };
+
         let local_call_info = LocalCallInfo {
             module_name: module_context.module_name.clone(),
             prefix: function_context.prefix,
         };
 
-        let call = call_construction.construct(function_call, Some(local_call_info));
+        let call = call_construction.construct(
+            function_call,
+            Some(local_call_info),
+            called_function_has_captures,
+        );
 
-        Ok([argument_instructions, call].concat())
+        Ok([argument_instructions, captures_instructions, call].concat())
     }
 
     // endregion
@@ -530,6 +547,78 @@ mod tests {
             "push constant 5",
             "push constant 7",
             "neg",
+            "call Test.bar_baz 2",
+        ]
+        .join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
+
+    #[test]
+    fn test_module_local_with_captures() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // fn bar x = _.
+        assert!(module_context
+            .scope
+            .enter_function(String::from("bar"), FunctionContextArguments::new(1))
+            .is_ok());
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("x"),
+                VariableContextArguments::new(vm::Segment::Argument)
+            )
+            .is_ok());
+
+        // fn baz a [x] = _.
+        assert!(module_context
+            .scope
+            .enter_function(
+                String::from("baz"),
+                FunctionContextArguments::new(1).with_captures(vec![String::from("x")])
+            )
+            .is_ok());
+
+        module_context.scope.leave_function();
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("baz")),
+        };
+        let arguments = vec![ast::JillExpression::Literal(ast::JillLiteral::Integer(5))];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            // argument
+            "push constant 5",
+            // captures
+            // create array
+            "push constant 1",
+            "call Array.new 1",
+            "pop temp 1",
+            // add `x`
+            "push constant 0",
+            "push temp 1",
+            "add",
+            "push argument 0",
+            "pop temp 0",
+            "pop pointer 1",
+            "push temp 0",
+            "pop that 0",
+            // push to stack
+            "push temp 1",
+            // call
             "call Test.bar_baz 2",
         ]
         .join("\n");
