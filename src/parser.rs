@@ -116,13 +116,14 @@ fn function_reference() -> impl Parser<char, JillFunctionReference, Error = Jill
                 .rewind()
                 .labelled("cannot reference and call a function"),
         )
-        .map(
-            |((modules_path, associated_type), function_name)| JillFunctionReference {
+        .map_with_span(|((modules_path, associated_type), function_name), _span| {
+            JillFunctionReference {
                 modules_path,
                 associated_type,
                 function_name,
-            },
-        )
+                _span,
+            }
+        })
 }
 
 fn function_call(
@@ -132,19 +133,21 @@ fn function_call(
 ) -> impl Parser<char, JillFunctionCall, Error = JillParseError> {
     let function_call_source = fully_qualified_function_name(identifier::function_call())
         .or(identifier::function_call().map(|name| ((vec![], None), name)))
-        .map(
-            |((modules_path, associated_type), function_name)| JillFunctionReference {
+        .map_with_span(|((modules_path, associated_type), function_name), _span| {
+            JillFunctionReference {
                 modules_path,
                 associated_type,
                 function_name,
-            },
-        );
+                _span,
+            }
+        });
 
     function_call_source
         .then(nested_expression_list(expression).delimited_by(just('('), just(')')))
-        .map(|(reference, arguments)| JillFunctionCall {
+        .map_with_span(|(reference, arguments), _span| JillFunctionCall {
             reference,
             arguments,
+            _span,
         })
 }
 
@@ -171,11 +174,12 @@ fn function_body(
         .then(variable().then_ignore(just(',')).repeated())
         .then(expression())
         .padded()
-        .map(
-            |((local_functions, local_variables), return_expression)| JillFunctionBody {
+        .map_with_span(
+            |((local_functions, local_variables), return_expression), _span| JillFunctionBody {
                 local_functions,
                 local_variables,
                 return_expression,
+                _span,
             },
         )
 }
@@ -187,7 +191,7 @@ fn variable() -> impl Parser<char, JillVariable, Error = JillParseError> {
         .then(expression())
         .padded()
         .padded_by(comments())
-        .map(|(name, value)| JillVariable { name, value })
+        .map_with_span(|(name, value), _span| JillVariable { name, value, _span })
 }
 
 fn function() -> impl Parser<char, JillFunction, Error = JillParseError> {
@@ -207,12 +211,15 @@ fn function() -> impl Parser<char, JillFunction, Error = JillParseError> {
             .then(function_body(function))
             .padded()
             .padded_by(comments())
-            .map(|(((name, arguments), captures), body)| JillFunction {
-                name,
-                arguments,
-                captures: captures.unwrap_or(vec![]),
-                body,
-            })
+            .map_with_span(
+                |(((name, arguments), captures), body), _span| JillFunction {
+                    name,
+                    arguments,
+                    captures: captures.unwrap_or(vec![]),
+                    body,
+                    _span,
+                },
+            )
     })
 }
 
@@ -225,9 +232,10 @@ fn r#type() -> impl Parser<char, JillType, Error = JillParseError> {
                 .delimited_by(just('('), just(')'))
                 .or_not(),
         )
-        .map(|(name, fields)| JillTypeVariant {
+        .map_with_span(|(name, fields), _span| JillTypeVariant {
             name,
             fields: fields.unwrap_or(Vec::new()),
+            _span,
         });
 
     text::keyword("type")
@@ -236,7 +244,11 @@ fn r#type() -> impl Parser<char, JillType, Error = JillParseError> {
         .then(variant.separated_by(just(',')))
         .padded()
         .padded_by(comments())
-        .map(|(name, variants)| JillType { name, variants })
+        .map_with_span(|(name, variants), _span| JillType {
+            name,
+            variants,
+            _span,
+        })
 }
 
 mod identifier {
@@ -282,7 +294,7 @@ mod identifier {
     pub fn function_call() -> impl Parser<char, JillIdentifier, Error = JillParseError> {
         // function call is the only place where we should accept
         // compiler internal (i.e. lazy evaluated) functions
-        non_keyword_identifier().map(JillIdentifier)
+        non_keyword_identifier().map_with_span(JillIdentifier)
     }
 
     // (({identifier} \ `_`) \ {keyword}) \ {compiler_internal}
@@ -295,7 +307,7 @@ mod identifier {
     macro_rules! make_non_compiler_internal_identifier {
         ($name: ident) => {
             pub fn $name() -> impl Parser<char, JillIdentifier, Error = JillParseError> {
-                non_compiler_internal_identifier().map(JillIdentifier)
+                non_compiler_internal_identifier().map_with_span(JillIdentifier)
             }
         };
     }
@@ -310,6 +322,6 @@ mod identifier {
         // non-internal, but allows pure `_`
         non_compiler_internal_identifier()
             .or(underscore().map(|()| String::new()))
-            .map(JillIdentifier)
+            .map_with_span(JillIdentifier)
     }
 }
