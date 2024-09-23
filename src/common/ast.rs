@@ -39,6 +39,21 @@ pub struct JillVariable {
     pub _span: Span,
 }
 
+impl JillVariable {
+    /// Construct an internally used Jill variable
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(name: JillIdentifier, value: JillExpression) -> Self {
+        Self {
+            name,
+            value,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct JillFunction {
     pub name: JillIdentifier,
@@ -48,6 +63,28 @@ pub struct JillFunction {
     pub _span: Span,
 }
 
+impl JillFunction {
+    /// Construct an internally used Jill function
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(
+        name: JillIdentifier,
+        arguments: Vec<JillIdentifier>,
+        captures: Vec<JillIdentifier>,
+        body: JillFunctionBody,
+    ) -> Self {
+        Self {
+            name,
+            arguments,
+            captures,
+            body,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct JillType {
     pub name: JillIdentifier,
@@ -55,11 +92,41 @@ pub struct JillType {
     pub _span: Span,
 }
 
+impl JillType {
+    /// Construct an internally used Jill type
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(name: JillIdentifier, variants: Vec<JillTypeVariant>) -> Self {
+        Self {
+            name,
+            variants,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct JillTypeVariant {
     pub name: JillIdentifier,
     pub fields: Vec<JillIdentifier>,
     pub _span: Span,
+}
+
+impl JillTypeVariant {
+    /// Construct an internally used Jill type variant
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(name: JillIdentifier, fields: Vec<JillIdentifier>) -> Self {
+        Self {
+            name,
+            fields,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -78,6 +145,26 @@ pub struct JillFunctionBody {
     pub _span: Span,
 }
 
+impl JillFunctionBody {
+    /// Construct an internally used Jill function body
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(
+        local_functions: Vec<JillFunction>,
+        local_variables: Vec<JillVariable>,
+        return_expression: JillExpression,
+    ) -> Self {
+        Self {
+            local_functions,
+            local_variables,
+            return_expression,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct JillFunctionReference {
     pub modules_path: Vec<JillIdentifier>,
@@ -86,11 +173,46 @@ pub struct JillFunctionReference {
     pub _span: Span,
 }
 
+impl JillFunctionReference {
+    /// Construct an internally used Jill function reference
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(
+        modules_path: Vec<JillIdentifier>,
+        associated_type: Option<JillIdentifier>,
+        function_name: JillIdentifier,
+    ) -> Self {
+        Self {
+            modules_path,
+            associated_type,
+            function_name,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct JillFunctionCall {
     pub reference: JillFunctionReference,
     pub arguments: Vec<JillExpression>,
     pub _span: Span,
+}
+
+impl JillFunctionCall {
+    /// Construct an internally used Jill function call
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(reference: JillFunctionReference, arguments: Vec<JillExpression>) -> Self {
+        Self {
+            reference,
+            arguments,
+            // did not come from a source file, so does not have a related span
+            _span: Span::default(),
+        }
+    }
 }
 
 // endregion
@@ -107,6 +229,17 @@ pub enum JillLiteral {
 
 #[derive(Debug, Clone)]
 pub struct JillIdentifier(pub String, pub Span);
+
+impl JillIdentifier {
+    /// Construct an internally used Jill identifier
+    /// (as opposed to a parsed one).
+    ///
+    /// Most commonly used in tests.
+    pub fn internal(name: String) -> Self {
+        // did not come from a source file, so does not have a related span
+        Self(name, Span::default())
+    }
+}
 
 impl std::fmt::Display for JillIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

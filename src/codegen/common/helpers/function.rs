@@ -73,6 +73,7 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
             modules_path: vec![],
             associated_type: None,
             function_name: function_definition.name.clone(),
+            _span: function_definition._span.clone(),
         }
     }
 

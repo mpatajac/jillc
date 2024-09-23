@@ -146,11 +146,11 @@ mod variant {
     ) -> FallableAction {
         for (i, field) in variant.fields.iter().enumerate() {
             // "{module_context.module_name}.{variant.name}_{field}"
-            let function_reference = ast::JillFunctionReference {
-                modules_path: vec![],
-                associated_type: Some(variant.name.clone()),
-                function_name: ast::JillIdentifier(field.0.clone()),
-            };
+            let function_reference = ast::JillFunctionReference::internal(
+                vec![],
+                Some(variant.name.clone()),
+                ast::JillIdentifier::internal(field.0.clone()),
+            );
             let vm_function_name = function_reference
                 .to_fully_qualified_hack_name(&module_context.module_name, String::new());
 
@@ -190,14 +190,11 @@ mod variant {
             //     variant.name,
             //     field.0.to_upper_camel_case()
             // );
-            let function_reference = ast::JillFunctionReference {
-                modules_path: vec![],
-                associated_type: Some(variant.name.clone()),
-                function_name: ast::JillIdentifier(format!(
-                    "update{}",
-                    field.0.to_upper_camel_case()
-                )),
-            };
+            let function_reference = ast::JillFunctionReference::internal(
+                vec![],
+                Some(variant.name.clone()),
+                ast::JillIdentifier::internal(format!("update{}", field.0.to_upper_camel_case())),
+            );
             let vm_function_name = function_reference
                 .to_fully_qualified_hack_name(&module_context.module_name, String::new());
 

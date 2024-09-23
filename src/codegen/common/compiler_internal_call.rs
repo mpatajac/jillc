@@ -314,11 +314,11 @@ fn construct_match(
 
     // region: Construction
 
-    let tag_fn_reference = ast::JillFunctionReference {
-        modules_path: function_reference.modules_path.clone(),
-        associated_type: function_reference.associated_type.clone(),
-        function_name: ast::JillIdentifier(String::from("tag")),
-    };
+    let tag_fn_reference = ast::JillFunctionReference::internal(
+        function_reference.modules_path.clone(),
+        function_reference.associated_type.clone(),
+        ast::JillIdentifier::internal(String::from("tag")),
+    );
 
     // `{Type}_tag` is a type-associated top-level function, so it is not nested (no need for prefix)
     // might be a locally-defined type, so we provide current module's name as default

@@ -107,11 +107,11 @@ fn construct_list(
 }
 
 fn note_std_list_constructor_usage(constructor: &str, program_context: &mut ProgramContext) {
-    let function_reference = ast::JillFunctionReference {
-        modules_path: vec![ast::JillIdentifier(String::from("List"))],
-        associated_type: None,
-        function_name: ast::JillIdentifier(constructor.to_owned()),
-    };
+    let function_reference = ast::JillFunctionReference::internal(
+        vec![ast::JillIdentifier::internal(String::from("List"))],
+        None,
+        ast::JillIdentifier::internal(constructor.to_owned()),
+    );
 
     program_context
         .std_usage_tracker
