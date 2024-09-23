@@ -2,12 +2,15 @@
 //! to Hack VM instructions.
 
 use context::{ModuleContext, ProgramContext};
+use error::FallableOutputFile;
 
 use crate::{common::ast, fileio::output::OutputFile};
 
-mod common;
 pub mod context;
 pub mod error;
+pub mod post_compilation;
+
+mod common;
 mod functions;
 mod globals;
 mod jillstd;
@@ -19,7 +22,7 @@ const GLOBALS_INIT_FN_NAME: &str = "_init__globals";
 pub fn construct_module(
     module: ast::JillModule,
     program_context: &mut ProgramContext,
-) -> Result<OutputFile, error::Error> {
+) -> FallableOutputFile {
     let mut module_context = ModuleContext::new(module.name);
 
     types::construct(module.content.types, &mut module_context, program_context)?;

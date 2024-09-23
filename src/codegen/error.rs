@@ -1,3 +1,5 @@
+use crate::fileio;
+
 use super::vm;
 
 /// List of all errors that could possibly occur during code generation.
@@ -17,3 +19,4 @@ pub enum Error {
 
 pub type FallableAction = Result<(), Error>;
 pub type FallableInstructions = Result<Vec<vm::VMInstruction>, Error>;
+pub type FallableOutputFile = Result<fileio::output::OutputFile, Error>;
