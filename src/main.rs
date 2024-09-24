@@ -48,7 +48,7 @@ fn apply_post_compilation_generation(
         output_generator.generate(globals_output)?;
 
         // add a custom Sys.vm (which is modified to include a call to `Globals.init`)
-        output_generator.generate(codegen::jillstd::sys_output())?;
+        output_generator.generate(post_compilation::jillstd::sys_output())?;
     }
 
     Ok(())

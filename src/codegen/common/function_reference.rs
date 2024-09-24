@@ -3,7 +3,8 @@ use crate::{
         common::helpers::{self, function::JillFunctionReferenceExtensions},
         context::{module::FunctionContext, ModuleContext, ProgramContext},
         error::{Error, FallableInstructions},
-        jillstd, vm,
+        post_compilation::jillstd,
+        vm,
     },
     common::ast,
 };

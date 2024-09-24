@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use strum::VariantNames;
 
-use crate::{common::ast, fileio};
-
-use super::{common::helpers::function::JillFunctionReferenceExtensions, vm};
+use crate::{
+    codegen::{common::helpers::function::JillFunctionReferenceExtensions, vm},
+    common::ast,
+    fileio,
+};
 
 // region: JillStd declaration
 
