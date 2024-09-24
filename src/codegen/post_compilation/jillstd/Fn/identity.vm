@@ -1,0 +1,3 @@
+function Fn.identity 0
+push argument 0
+return

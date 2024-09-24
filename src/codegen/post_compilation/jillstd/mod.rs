@@ -269,12 +269,15 @@ impl JillStdList {
 )]
 #[strum(serialize_all = "camelCase")]
 enum JillStdFn {
+    #[strum(props(Arity = "1"))]
     Identity,
 }
 
 impl JillStdFn {
     const fn instructions(self) -> &'static str {
-        todo!()
+        match self {
+            Self::Identity => include_str!("Fn/identity.vm"),
+        }
     }
 }
 
