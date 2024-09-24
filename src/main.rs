@@ -18,9 +18,11 @@ fn main() {
             Err(error) => eprintln!("Unable to load file at `{file_path:#?}`: {error}"),
             Ok(file_info) => match parser::parse_module(&file_info) {
                 Ok(ast) => {
-                    dbg!(&ast);
-                    let to_generate = codegen::construct_module(ast, &mut program_context);
-                    dbg!(to_generate.lines().collect::<Vec<_>>());
+                    // dbg!(&ast);
+                    match codegen::construct_module(ast, &mut program_context) {
+                        Ok(output_file) => output_generator.generate(output_file).unwrap(),
+                        Err(error) => eprintln!("{error:#?}"),
+                    };
                 }
                 Err(errors) => error_report::display(
                     file_path.to_string_lossy().as_ref(),
