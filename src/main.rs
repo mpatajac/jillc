@@ -51,6 +51,11 @@ fn apply_post_compilation_generation(
         output_generator.generate(post_compilation::jillstd::sys_output())?;
     }
 
+    // jillstd
+    for jillstd_module_output in post_compilation::jillstd::construct(program_context) {
+        output_generator.generate(jillstd_module_output)?;
+    }
+
     Ok(())
 }
 

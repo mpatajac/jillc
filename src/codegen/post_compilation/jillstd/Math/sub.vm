@@ -1,0 +1,5 @@
+function Math.sub 0
+push argument 0
+push argument 1
+sub
+return

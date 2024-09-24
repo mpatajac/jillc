@@ -80,6 +80,7 @@ dependencies = [
  "heck",
  "phf",
  "strum",
+ "strum_macros",
 ]
 
 [[package]]
