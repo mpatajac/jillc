@@ -172,13 +172,24 @@ pub mod output {
         }
     }
 
-    pub fn generate(root_path: &Path, output_file: OutputFile) -> io::Result<()> {
-        super::check_root_path(root_path)?;
+    pub struct OutputGenerator {
+        bin_path: PathBuf,
+    }
 
-        let bin_path = ensure_bin_dir_exists(root_path)?;
-        let file_path = bin_path.join(output_file.name).with_extension("vm");
+    impl OutputGenerator {
+        pub fn setup(root_path: &Path) -> io::Result<Self> {
+            super::check_root_path(root_path)?;
 
-        fs::write(file_path, output_file.content)
+            let bin_path = ensure_bin_dir_exists(root_path)?;
+
+            Ok(Self { bin_path })
+        }
+
+        pub fn generate(&self, output_file: OutputFile) -> io::Result<()> {
+            let file_path = self.bin_path.join(output_file.name).with_extension("vm");
+
+            fs::write(file_path, output_file.content)
+        }
     }
 
     fn ensure_bin_dir_exists(root_path: &Path) -> io::Result<PathBuf> {

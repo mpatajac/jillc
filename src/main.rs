@@ -1,4 +1,4 @@
-use fileio::input::SourceDir;
+use fileio::{input::SourceDir, output::OutputGenerator};
 use std::path::Path;
 
 mod codegen;
@@ -9,6 +9,7 @@ mod parser;
 fn main() {
     let root_path = Path::new("./tmp");
     let source_dir = SourceDir::setup(root_path).unwrap();
+    let output_generator = OutputGenerator::setup(root_path).unwrap();
 
     let mut program_context = codegen::context::ProgramContext::new();
 
