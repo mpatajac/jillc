@@ -1,0 +1,9 @@
+function Math.mod 0
+push argument 0
+push argument 0
+push argument 1
+call Math.divide 2
+push argument 1
+call Math.multiply 2
+sub
+return

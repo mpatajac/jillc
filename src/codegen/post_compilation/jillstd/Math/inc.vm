@@ -1,0 +1,5 @@
+function Math.inc 0
+push argument 0
+push constant 1
+add
+return

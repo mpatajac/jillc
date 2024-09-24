@@ -126,7 +126,13 @@ impl JillStdMath {
         match self {
             Self::Add => include_str!("Math/add.vm"),
             Self::Sub => include_str!("Math/sub.vm"),
-            _ => todo!(),
+            Self::Mult => include_str!("Math/mult.vm"),
+            Self::Div => include_str!("Math/div.vm"),
+            Self::Mod => include_str!("Math/mod.vm"),
+            Self::Inc => include_str!("Math/inc.vm"),
+            Self::Dec => include_str!("Math/dec.vm"),
+            // Jack API overrides - no need to generate anything
+            Self::Min | Self::Max | Self::Sqrt => "",
         }
     }
 }

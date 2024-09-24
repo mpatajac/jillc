@@ -1,0 +1,5 @@
+function Math.dec 0
+push argument 0
+push constant 1
+sub
+return
