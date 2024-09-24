@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::codegen::{
     error::{Error, FallableAction},
-    jillstd::JillStdUsageTracker,
+    post_compilation::jillstd::JillStdUsageTracker,
     vm,
 };
 
