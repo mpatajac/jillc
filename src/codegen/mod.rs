@@ -8,12 +8,12 @@ use crate::{common::ast, fileio::output::OutputFile};
 
 pub mod context;
 pub mod error;
+pub mod jillstd;
 pub mod post_compilation;
 
 mod common;
 mod functions;
 mod globals;
-mod jillstd;
 mod types;
 mod vm;
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use strum::VariantNames;
 
-use crate::common::ast;
+use crate::{common::ast, fileio};
 
 use super::{common::helpers::function::JillFunctionReferenceExtensions, vm};
 
@@ -199,6 +199,12 @@ impl JillStdUsageTracker {
 }
 
 // endregion
+
+pub fn sys_output() -> fileio::output::OutputFile {
+    let sys_vm = include_str!("Sys.vm").to_string();
+
+    fileio::output::OutputFile::new(String::from("Sys.vm"), sys_vm)
+}
 
 #[cfg(test)]
 mod tests {

@@ -32,6 +32,26 @@ fn main() {
             },
         }
     }
+
+    apply_post_compilation_generation(&output_generator, &mut program_context).unwrap();
+}
+
+fn apply_post_compilation_generation(
+    output_generator: &OutputGenerator,
+    program_context: &mut codegen::context::ProgramContext,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use codegen::post_compilation;
+
+    // globals initialization
+    if let Some(globals_output) = post_compilation::globals::construct(program_context) {
+        // output globals
+        output_generator.generate(globals_output)?;
+
+        // add a custom Sys.vm (which is modified to include a call to `Globals.init`)
+        output_generator.generate(codegen::jillstd::sys_output())?;
+    }
+
+    Ok(())
 }
 
 mod error_report {
