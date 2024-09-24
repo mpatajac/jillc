@@ -62,7 +62,7 @@ impl JillStdModule {
             .expect("all associated arities should be valid (usize) numbers")
     }
 
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         // TODO: figure out if there is a more elegant way to do this (proc macro?)
         match self {
             Self::Math(f) => f.instructions(),
@@ -122,7 +122,7 @@ enum JillStdMath {
 }
 
 impl JillStdMath {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         match self {
             Self::Add => include_str!("Math/add.vm"),
             Self::Sub => include_str!("Math/sub.vm"),
@@ -171,7 +171,7 @@ enum JillStdBool {
 }
 
 impl JillStdBool {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         todo!()
     }
 }
@@ -220,7 +220,7 @@ enum JillStdList {
 }
 
 impl JillStdList {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         todo!()
     }
 }
@@ -248,7 +248,7 @@ enum JillStdFn {
 }
 
 impl JillStdFn {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         todo!()
     }
 }
@@ -282,7 +282,7 @@ enum JillStdRandom {
 }
 
 impl JillStdRandom {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         todo!()
     }
 }
