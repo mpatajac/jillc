@@ -8,7 +8,6 @@ use crate::{common::ast, fileio::output::OutputFile};
 
 pub mod context;
 pub mod error;
-pub mod jillstd;
 pub mod post_compilation;
 
 mod common;
