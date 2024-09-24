@@ -1,0 +1,6 @@
+function Bool.ge 0
+push argument 0
+push argument 1
+lt
+not
+return

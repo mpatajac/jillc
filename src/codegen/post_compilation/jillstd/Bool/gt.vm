@@ -1,0 +1,5 @@
+function Bool.gt 0
+push argument 0
+push argument 1
+gt
+return

@@ -157,28 +157,47 @@ impl JillStdMath {
 #[strum(serialize_all = "camelCase")]
 enum JillStdBool {
     /// `==`
+    #[strum(props(Arity = "2"))]
     Eq,
     /// `!=`
+    #[strum(props(Arity = "2"))]
     Ne,
     /// `&&`
+    #[strum(props(Arity = "2"))]
     And,
     /// `||`
+    #[strum(props(Arity = "2"))]
     Or,
     /// `!`
+    #[strum(props(Arity = "1"))]
     Not,
     /// `<`
+    #[strum(props(Arity = "2"))]
     Lt,
     /// `>`
+    #[strum(props(Arity = "2"))]
     Gt,
     /// `<=`
+    #[strum(props(Arity = "2"))]
     Le,
     /// `>=`
+    #[strum(props(Arity = "2"))]
     Ge,
 }
 
 impl JillStdBool {
     const fn instructions(self) -> &'static str {
-        todo!()
+        match self {
+            Self::Eq => include_str!("Bool/eq.vm"),
+            Self::Ne => include_str!("Bool/ne.vm"),
+            Self::And => include_str!("Bool/and.vm"),
+            Self::Or => include_str!("Bool/or.vm"),
+            Self::Not => include_str!("Bool/not.vm"),
+            Self::Lt => include_str!("Bool/lt.vm"),
+            Self::Gt => include_str!("Bool/gt.vm"),
+            Self::Le => include_str!("Bool/le.vm"),
+            Self::Ge => include_str!("Bool/ge.vm"),
+        }
     }
 }
 
