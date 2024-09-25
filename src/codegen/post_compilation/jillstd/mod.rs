@@ -259,6 +259,8 @@ enum JillStdList {
     #[strum(props(Arity = "0"))]
     #[strum(serialize = "Empty")]
     Empty,
+
+    #[strum(props(Arity = "2"))]
     #[strum(serialize = "List")]
     List,
     #[strum(serialize = "List_head")]
@@ -293,6 +295,7 @@ impl JillStdList {
         match self {
             Self::Tag => include_str!("List/List_tag.vm"),
             Self::Empty => include_str!("List/Empty.vm"),
+            Self::List => include_str!("List/List.vm"),
             _ => todo!(),
         }
     }
