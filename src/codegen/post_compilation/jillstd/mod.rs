@@ -284,7 +284,10 @@ enum JillStdList {
 		List.List_tail,
 	"))]
     Reverse,
+
+    #[strum(props(Arity = "2"))]
     #[strum(props(Dependencies = "
+		List.List_tag,
 		List.Empty,
 		List.List,
 		List.List_head,
@@ -313,6 +316,7 @@ impl JillStdList {
             Self::Head => include_str!("List/List_head.vm"),
             Self::Tail => include_str!("List/List_tail.vm"),
             Self::Reverse => include_str!("List/reverse.vm"),
+            Self::Map => include_str!("List/map.vm"),
             _ => todo!(),
         }
     }
@@ -573,6 +577,7 @@ mod tests {
         let is_list_function_noted = |&f| list_noted_functions.get(&f).is_some_and(|&b| b);
 
         assert!([
+            JillStdModule::List(JillStdList::Tag),
             JillStdModule::List(JillStdList::Empty),
             JillStdModule::List(JillStdList::List),
             JillStdModule::List(JillStdList::Head),
