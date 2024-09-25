@@ -306,6 +306,13 @@ enum JillStdList {
 		List.reverse
 	"))]
     Filter,
+
+    #[strum(props(Arity = "3"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
     Fold,
 
     #[strum(props(Arity = "2"))]
@@ -335,6 +342,7 @@ impl JillStdList {
             Self::Reverse => include_str!("List/reverse.vm"),
             Self::Map => include_str!("List/map.vm"),
             Self::Filter => include_str!("List/filter.vm"),
+            Self::Fold => include_str!("List/fold.vm"),
             Self::Repeat => include_str!("List/repeat.vm"),
             _ => todo!(),
         }
