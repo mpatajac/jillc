@@ -267,6 +267,8 @@ enum JillStdList {
     #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_head")]
     Head,
+
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_tail")]
     Tail,
 
@@ -299,6 +301,7 @@ impl JillStdList {
             Self::Empty => include_str!("List/Empty.vm"),
             Self::List => include_str!("List/List.vm"),
             Self::Head => include_str!("List/List_head.vm"),
+            Self::Tail => include_str!("List/List_tail.vm"),
             _ => todo!(),
         }
     }
