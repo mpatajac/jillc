@@ -273,6 +273,14 @@ enum JillStdList {
     Tail,
 
     // module functions
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+	"))]
     Reverse,
     #[strum(props(Dependencies = "
 		List.Empty,
@@ -302,6 +310,7 @@ impl JillStdList {
             Self::List => include_str!("List/List.vm"),
             Self::Head => include_str!("List/List_head.vm"),
             Self::Tail => include_str!("List/List_tail.vm"),
+            Self::Reverse => include_str!("List/reverse.vm"),
             _ => todo!(),
         }
     }
