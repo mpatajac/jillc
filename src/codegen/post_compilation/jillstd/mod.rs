@@ -433,6 +433,7 @@ impl JillStdFn {
 #[strum(serialize_all = "camelCase")]
 enum JillStdRandom {
     // type-associated functions
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "Random")]
     Random,
 
@@ -443,7 +444,10 @@ enum JillStdRandom {
 
 impl JillStdRandom {
     const fn instructions(self) -> &'static str {
-        todo!()
+        match self {
+            Self::Random => include_str!("Random/Random.vm"),
+            _ => todo!(),
+        }
     }
 }
 
