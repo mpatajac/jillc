@@ -48,15 +48,7 @@ impl JillStdModule {
     }
 
     fn function_arity(self) -> usize {
-        let raw_arity = match self {
-            Self::Math(f) => f.get_str("Arity"),
-            Self::Bool(f) => f.get_str("Arity"),
-            Self::List(f) => f.get_str("Arity"),
-            Self::Fn(f) => f.get_str("Arity"),
-            Self::Random(f) => f.get_str("Arity"),
-        };
-
-        raw_arity
+        self.get_attribute("Arity")
             .expect("all jill std variants should have associated arity")
             .parse()
             .expect("all associated arities should be valid (usize) numbers")
@@ -71,6 +63,45 @@ impl JillStdModule {
             Self::Fn(f) => f.instructions(),
             Self::Random(f) => f.instructions(),
         }
+    }
+
+    fn dependencies(self) -> Vec<ast::JillFunctionReference> {
+        self.get_attribute("Dependencies")
+            .map_or_else(Vec::new, |dependencies| {
+                dependencies
+                    .split(',')
+                    .map(jillstd_literal_to_function_reference)
+                    .collect()
+            })
+    }
+
+    fn get_attribute(self, enum_attribute: &str) -> Option<&'static str> {
+        match self {
+            Self::Math(f) => f.get_str(enum_attribute),
+            Self::Bool(f) => f.get_str(enum_attribute),
+            Self::List(f) => f.get_str(enum_attribute),
+            Self::Fn(f) => f.get_str(enum_attribute),
+            Self::Random(f) => f.get_str(enum_attribute),
+        }
+    }
+}
+
+fn jillstd_literal_to_function_reference(literal: &str) -> ast::JillFunctionReference {
+    let function_components: Vec<_> = literal.trim().split('.').collect();
+
+    // expect literals to be in form `Module.function`
+    assert!(
+        function_components.len() == 2,
+        "invalid jillstd literal: {literal}"
+    );
+
+    let module_name = function_components[0];
+    let function_name = function_components[1];
+
+    ast::JillFunctionReference {
+        modules_path: vec![ast::JillIdentifier(module_name.to_string())],
+        associated_type: None,
+        function_name: ast::JillIdentifier(function_name.to_string()),
     }
 }
 
@@ -231,6 +262,14 @@ enum JillStdList {
     Tail,
 
     // module functions
+    Reverse,
+    #[strum(props(Dependencies = "
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+		List.reverse
+	"))]
     Map,
     Filter,
     Fold,
@@ -411,6 +450,11 @@ impl JillStdUsageTracker {
 
         *function_used = true;
 
+        // note dependencies (if any)
+        for dependency in function.dependencies() {
+            self.note_usage(&dependency);
+        }
+
         JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
     }
 
@@ -485,10 +529,29 @@ mod tests {
             function_name: ast::JillIdentifier(String::from("map")),
         };
 
+        // check that `List.map` was successfully added
         assert_eq!(
             usage_tracker.note_usage(&function_reference),
             JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
         );
+
+        // check that `List.map` dependencies were successfully added
+        let list_noted_functions = usage_tracker
+            .0
+            .get(&JillStdModuleDiscriminants::List)
+            .expect("List module should be present in JillStd usage notes");
+
+        let is_list_function_noted = |&f| list_noted_functions.get(&f).is_some_and(|&b| b);
+
+        assert!([
+            JillStdModule::List(JillStdList::Empty),
+            JillStdModule::List(JillStdList::List),
+            JillStdModule::List(JillStdList::Head),
+            JillStdModule::List(JillStdList::Tail),
+            JillStdModule::List(JillStdList::Reverse),
+        ]
+        .iter()
+        .all(is_list_function_noted));
 
         // case 2
         let function_reference = ast::JillFunctionReference {
