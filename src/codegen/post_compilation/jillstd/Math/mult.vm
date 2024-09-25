@@ -1,0 +1,5 @@
+function Math.mult 0
+push argument 0
+push argument 1
+call Math.multiply 2
+return

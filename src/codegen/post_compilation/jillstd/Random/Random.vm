@@ -1,0 +1,12 @@
+function Random.Random 0
+push constant 3
+call Memory.alloc 1
+pop pointer 0
+push argument 0
+pop this 0
+push constant 219
+pop this 1
+push constant 32749
+pop this 2
+push pointer 0
+return

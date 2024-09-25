@@ -48,21 +48,13 @@ impl JillStdModule {
     }
 
     fn function_arity(self) -> usize {
-        let raw_arity = match self {
-            Self::Math(f) => f.get_str("Arity"),
-            Self::Bool(f) => f.get_str("Arity"),
-            Self::List(f) => f.get_str("Arity"),
-            Self::Fn(f) => f.get_str("Arity"),
-            Self::Random(f) => f.get_str("Arity"),
-        };
-
-        raw_arity
+        self.get_attribute("Arity")
             .expect("all jill std variants should have associated arity")
             .parse()
             .expect("all associated arities should be valid (usize) numbers")
     }
 
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         // TODO: figure out if there is a more elegant way to do this (proc macro?)
         match self {
             Self::Math(f) => f.instructions(),
@@ -71,6 +63,47 @@ impl JillStdModule {
             Self::Fn(f) => f.instructions(),
             Self::Random(f) => f.instructions(),
         }
+    }
+
+    fn dependencies(self) -> Vec<ast::JillFunctionReference> {
+        self.get_attribute("Dependencies")
+            .map_or_else(Vec::new, |dependencies| {
+                dependencies
+                    .split(',')
+                    // trailing comma in dependency list leaves an "empty dependency"
+                    .filter(|d| !d.trim().is_empty())
+                    .map(jillstd_literal_to_function_reference)
+                    .collect()
+            })
+    }
+
+    fn get_attribute(self, enum_attribute: &str) -> Option<&'static str> {
+        match self {
+            Self::Math(f) => f.get_str(enum_attribute),
+            Self::Bool(f) => f.get_str(enum_attribute),
+            Self::List(f) => f.get_str(enum_attribute),
+            Self::Fn(f) => f.get_str(enum_attribute),
+            Self::Random(f) => f.get_str(enum_attribute),
+        }
+    }
+}
+
+fn jillstd_literal_to_function_reference(literal: &str) -> ast::JillFunctionReference {
+    let function_components: Vec<_> = literal.trim().split('.').collect();
+
+    // expect literals to be in form `Module.function`
+    assert!(
+        function_components.len() == 2,
+        "invalid jillstd literal: {literal}"
+    );
+
+    let module_name = function_components[0];
+    let function_name = function_components[1];
+
+    ast::JillFunctionReference {
+        modules_path: vec![ast::JillIdentifier(module_name.to_string())],
+        associated_type: None,
+        function_name: ast::JillIdentifier(function_name.to_string()),
     }
 }
 
@@ -122,11 +155,17 @@ enum JillStdMath {
 }
 
 impl JillStdMath {
-    fn instructions(self) -> &'static str {
+    const fn instructions(self) -> &'static str {
         match self {
             Self::Add => include_str!("Math/add.vm"),
             Self::Sub => include_str!("Math/sub.vm"),
-            _ => todo!(),
+            Self::Mult => include_str!("Math/mult.vm"),
+            Self::Div => include_str!("Math/div.vm"),
+            Self::Mod => include_str!("Math/mod.vm"),
+            Self::Inc => include_str!("Math/inc.vm"),
+            Self::Dec => include_str!("Math/dec.vm"),
+            // Jack API overrides - no need to generate anything
+            Self::Min | Self::Max | Self::Sqrt => "",
         }
     }
 }
@@ -151,28 +190,47 @@ impl JillStdMath {
 #[strum(serialize_all = "camelCase")]
 enum JillStdBool {
     /// `==`
+    #[strum(props(Arity = "2"))]
     Eq,
     /// `!=`
+    #[strum(props(Arity = "2"))]
     Ne,
     /// `&&`
+    #[strum(props(Arity = "2"))]
     And,
     /// `||`
+    #[strum(props(Arity = "2"))]
     Or,
     /// `!`
+    #[strum(props(Arity = "1"))]
     Not,
     /// `<`
+    #[strum(props(Arity = "2"))]
     Lt,
     /// `>`
+    #[strum(props(Arity = "2"))]
     Gt,
     /// `<=`
+    #[strum(props(Arity = "2"))]
     Le,
     /// `>=`
+    #[strum(props(Arity = "2"))]
     Ge,
 }
 
 impl JillStdBool {
-    fn instructions(self) -> &'static str {
-        todo!()
+    const fn instructions(self) -> &'static str {
+        match self {
+            Self::Eq => include_str!("Bool/eq.vm"),
+            Self::Ne => include_str!("Bool/ne.vm"),
+            Self::And => include_str!("Bool/and.vm"),
+            Self::Or => include_str!("Bool/or.vm"),
+            Self::Not => include_str!("Bool/not.vm"),
+            Self::Lt => include_str!("Bool/lt.vm"),
+            Self::Gt => include_str!("Bool/gt.vm"),
+            Self::Le => include_str!("Bool/le.vm"),
+            Self::Ge => include_str!("Bool/ge.vm"),
+        }
     }
 }
 
@@ -196,32 +254,131 @@ impl JillStdBool {
 #[strum(serialize_all = "camelCase")]
 enum JillStdList {
     // type-associated functions
+    #[strum(props(Arity = "1"))]
+    #[strum(serialize = "List_tag")]
+    Tag,
+
+    #[strum(props(Arity = "0"))]
     #[strum(serialize = "Empty")]
     Empty,
+
+    #[strum(props(Arity = "2"))]
     #[strum(serialize = "List")]
     List,
+
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_head")]
     Head,
+
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_tail")]
     Tail,
 
     // module functions
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+	"))]
+    Reverse,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+		List.reverse
+	"))]
     Map,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+		List.reverse
+	"))]
     Filter,
+
+    #[strum(props(Arity = "3"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
     Fold,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		Math.dec,
+		List.Empty,
+		List.List,
+	"))]
     Repeat,
-    Length,
-    Zip,
-    All,
-    Any,
-    IsEmpty,
-    Concat,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		Math.dec,
+		List.Empty,
+		List.List,
+	"))]
     Range,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "
+		Math.inc,
+		List.List_tag,
+		List.List_tail,
+	"))]
+    Length,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "List.List_tag"))]
+    IsEmpty,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
+    All,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
+    Any,
 }
 
 impl JillStdList {
-    fn instructions(self) -> &'static str {
-        todo!()
+    const fn instructions(self) -> &'static str {
+        match self {
+            Self::Tag => include_str!("List/List_tag.vm"),
+            Self::Empty => include_str!("List/Empty.vm"),
+            Self::List => include_str!("List/List.vm"),
+            Self::Head => include_str!("List/List_head.vm"),
+            Self::Tail => include_str!("List/List_tail.vm"),
+            Self::Reverse => include_str!("List/reverse.vm"),
+            Self::Map => include_str!("List/map.vm"),
+            Self::Filter => include_str!("List/filter.vm"),
+            Self::Fold => include_str!("List/fold.vm"),
+            Self::Repeat => include_str!("List/repeat.vm"),
+            Self::Range => include_str!("List/range.vm"),
+            Self::Length => include_str!("List/length.vm"),
+            Self::IsEmpty => include_str!("List/isEmpty.vm"),
+            Self::All => include_str!("List/all.vm"),
+            Self::Any => include_str!("List/any.vm"),
+        }
     }
 }
 
@@ -244,12 +401,15 @@ impl JillStdList {
 )]
 #[strum(serialize_all = "camelCase")]
 enum JillStdFn {
+    #[strum(props(Arity = "1"))]
     Identity,
 }
 
 impl JillStdFn {
-    fn instructions(self) -> &'static str {
-        todo!()
+    const fn instructions(self) -> &'static str {
+        match self {
+            Self::Identity => include_str!("Fn/identity.vm"),
+        }
     }
 }
 
@@ -273,17 +433,30 @@ impl JillStdFn {
 #[strum(serialize_all = "camelCase")]
 enum JillStdRandom {
     // type-associated functions
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "Random")]
     Random,
 
     // module functions
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "Math.mod"))]
     Next,
+
+    #[strum(props(Arity = "3"))]
+    #[strum(props(Dependencies = "
+		Math.mod,
+		Random.next
+	"))]
     FromRange,
 }
 
 impl JillStdRandom {
-    fn instructions(self) -> &'static str {
-        todo!()
+    const fn instructions(self) -> &'static str {
+        match self {
+            Self::Random => include_str!("Random/Random.vm"),
+            Self::Next => include_str!("Random/next.vm"),
+            Self::FromRange => include_str!("Random/fromRange.vm"),
+        }
     }
 }
 
@@ -383,6 +556,11 @@ impl JillStdUsageTracker {
 
         *function_used = true;
 
+        // note dependencies (if any)
+        for dependency in function.dependencies() {
+            self.note_usage(&dependency);
+        }
+
         JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
     }
 
@@ -457,10 +635,30 @@ mod tests {
             function_name: ast::JillIdentifier(String::from("map")),
         };
 
+        // check that `List.map` was successfully added
         assert_eq!(
             usage_tracker.note_usage(&function_reference),
             JillStdFunctionUsageNoteOutcome::JillStdFunctionUsageNoted
         );
+
+        // check that `List.map` dependencies were successfully added
+        let list_noted_functions = usage_tracker
+            .0
+            .get(&JillStdModuleDiscriminants::List)
+            .expect("List module should be present in JillStd usage notes");
+
+        let is_list_function_noted = |&f| list_noted_functions.get(&f).is_some_and(|&b| b);
+
+        assert!([
+            JillStdModule::List(JillStdList::Tag),
+            JillStdModule::List(JillStdList::Empty),
+            JillStdModule::List(JillStdList::List),
+            JillStdModule::List(JillStdList::Head),
+            JillStdModule::List(JillStdList::Tail),
+            JillStdModule::List(JillStdList::Reverse),
+        ]
+        .iter()
+        .all(is_list_function_noted));
 
         // case 2
         let function_reference = ast::JillFunctionReference {

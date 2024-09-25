@@ -1,0 +1,6 @@
+function Bool.ne 0
+push argument 0
+push argument 1
+eq
+not
+return
