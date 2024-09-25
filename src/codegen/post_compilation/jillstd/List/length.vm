@@ -1,0 +1,22 @@
+function List.length_lengthRec 0
+label REC_CALL_0
+push argument 1
+call List.List_tag 1
+push constant 0
+eq
+if-goto VARIANT_0_0
+push argument 0
+call Math.inc 1
+push argument 1
+call List.List_tail 1
+pop argument 1
+pop argument 0
+goto REC_CALL_0
+label VARIANT_0_0
+push argument 0
+return
+function List.length 0
+push constant 0
+push argument 0
+call List.length_lengthRec 2
+return

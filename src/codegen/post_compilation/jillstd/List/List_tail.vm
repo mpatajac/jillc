@@ -1,0 +1,5 @@
+function List.List_tail 0
+push argument 0
+pop pointer 0
+push this 2
+return

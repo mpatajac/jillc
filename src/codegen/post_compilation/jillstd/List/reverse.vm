@@ -1,0 +1,24 @@
+function List.reverse_reverseRec 0
+label REC_CALL_0
+push argument 1
+call List.List_tag 1
+push constant 0
+eq
+if-goto VARIANT_0_0
+push argument 1
+call List.List_head 1
+push argument 0
+call List.List 2
+push argument 1
+call List.List_tail 1
+pop argument 1
+pop argument 0
+goto REC_CALL_0
+label VARIANT_0_0
+push argument 0
+return
+function List.reverse 0
+call List.Empty 0
+push argument 0
+call List.reverse_reverseRec 2
+return

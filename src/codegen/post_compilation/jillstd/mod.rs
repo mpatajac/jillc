@@ -70,6 +70,8 @@ impl JillStdModule {
             .map_or_else(Vec::new, |dependencies| {
                 dependencies
                     .split(',')
+                    // trailing comma in dependency list leaves an "empty dependency"
+                    .filter(|d| !d.trim().is_empty())
                     .map(jillstd_literal_to_function_reference)
                     .collect()
             })
@@ -252,18 +254,40 @@ impl JillStdBool {
 #[strum(serialize_all = "camelCase")]
 enum JillStdList {
     // type-associated functions
+    #[strum(props(Arity = "1"))]
+    #[strum(serialize = "List_tag")]
+    Tag,
+
+    #[strum(props(Arity = "0"))]
     #[strum(serialize = "Empty")]
     Empty,
+
+    #[strum(props(Arity = "2"))]
     #[strum(serialize = "List")]
     List,
+
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_head")]
     Head,
+
+    #[strum(props(Arity = "1"))]
     #[strum(serialize = "List_tail")]
     Tail,
 
     // module functions
-    Reverse,
+    #[strum(props(Arity = "1"))]
     #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+	"))]
+    Reverse,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
 		List.Empty,
 		List.List,
 		List.List_head,
@@ -271,21 +295,90 @@ enum JillStdList {
 		List.reverse
 	"))]
     Map,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.Empty,
+		List.List,
+		List.List_head,
+		List.List_tail,
+		List.reverse
+	"))]
     Filter,
+
+    #[strum(props(Arity = "3"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
     Fold,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		Math.dec,
+		List.Empty,
+		List.List,
+	"))]
     Repeat,
-    Length,
-    Zip,
-    All,
-    Any,
-    IsEmpty,
-    Concat,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		Math.dec,
+		List.Empty,
+		List.List,
+	"))]
     Range,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "
+		Math.inc,
+		List.List_tag,
+		List.List_tail,
+	"))]
+    Length,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "List.List_tag"))]
+    IsEmpty,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
+    All,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
+    Any,
 }
 
 impl JillStdList {
     const fn instructions(self) -> &'static str {
-        todo!()
+        match self {
+            Self::Tag => include_str!("List/List_tag.vm"),
+            Self::Empty => include_str!("List/Empty.vm"),
+            Self::List => include_str!("List/List.vm"),
+            Self::Head => include_str!("List/List_head.vm"),
+            Self::Tail => include_str!("List/List_tail.vm"),
+            Self::Reverse => include_str!("List/reverse.vm"),
+            Self::Map => include_str!("List/map.vm"),
+            Self::Filter => include_str!("List/filter.vm"),
+            Self::Fold => include_str!("List/fold.vm"),
+            Self::Repeat => include_str!("List/repeat.vm"),
+            Self::Range => include_str!("List/range.vm"),
+            Self::Length => include_str!("List/length.vm"),
+            Self::IsEmpty => include_str!("List/isEmpty.vm"),
+            Self::All => include_str!("List/all.vm"),
+            Self::Any => include_str!("List/any.vm"),
+        }
     }
 }
 
@@ -544,6 +637,7 @@ mod tests {
         let is_list_function_noted = |&f| list_noted_functions.get(&f).is_some_and(|&b| b);
 
         assert!([
+            JillStdModule::List(JillStdList::Tag),
             JillStdModule::List(JillStdList::Empty),
             JillStdModule::List(JillStdList::List),
             JillStdModule::List(JillStdList::Head),
