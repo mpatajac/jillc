@@ -322,13 +322,14 @@ enum JillStdList {
 		List.List,
 	"))]
     Repeat,
+    Range,
     Length,
-    Zip,
+    IsEmpty,
     All,
     Any,
-    IsEmpty,
     Concat,
-    Range,
+    // TODO?: will it make sense
+    // Zip,
 }
 
 impl JillStdList {
