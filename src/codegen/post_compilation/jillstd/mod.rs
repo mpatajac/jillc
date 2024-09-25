@@ -70,6 +70,8 @@ impl JillStdModule {
             .map_or_else(Vec::new, |dependencies| {
                 dependencies
                     .split(',')
+                    // trailing comma in dependency list leaves an "empty dependency"
+                    .filter(|d| !d.trim().is_empty())
                     .map(jillstd_literal_to_function_reference)
                     .collect()
             })
