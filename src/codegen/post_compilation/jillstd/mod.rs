@@ -252,6 +252,9 @@ impl JillStdBool {
 #[strum(serialize_all = "camelCase")]
 enum JillStdList {
     // type-associated functions
+    #[strum(props(Arity = "1"))]
+    #[strum(serialize = "List_tag")]
+    Tag,
     #[strum(serialize = "Empty")]
     Empty,
     #[strum(serialize = "List")]
@@ -285,7 +288,10 @@ enum JillStdList {
 
 impl JillStdList {
     const fn instructions(self) -> &'static str {
-        todo!()
+        match self {
+            Self::Tag => include_str!("List/List_tag.vm"),
+            _ => todo!(),
+        }
     }
 }
 
