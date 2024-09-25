@@ -533,7 +533,7 @@ impl JillStdUsageTracker {
             .iter()
             .map(|module_identifier| module_identifier.0.clone())
             .collect::<Vec<_>>()
-            .join("::");
+            .join("_");
 
         // check that the function reference module is one of JillStd ones
         let Ok(module_name) = JillStdModuleDiscriminants::from_str(&module_path) else {
