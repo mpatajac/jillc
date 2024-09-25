@@ -1,0 +1,10 @@
+function Random.fromRange 1
+push argument 0
+call Random.next 1
+push argument 2
+push argument 1
+sub
+call Math.mod 2
+push argument 1
+add
+return

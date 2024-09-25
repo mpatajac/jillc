@@ -441,6 +441,12 @@ enum JillStdRandom {
     #[strum(props(Arity = "1"))]
     #[strum(props(Dependencies = "Math.mod"))]
     Next,
+
+    #[strum(props(Arity = "3"))]
+    #[strum(props(Dependencies = "
+		Math.mod,
+		Random.next
+	"))]
     FromRange,
 }
 
@@ -449,7 +455,7 @@ impl JillStdRandom {
         match self {
             Self::Random => include_str!("Random/Random.vm"),
             Self::Next => include_str!("Random/next.vm"),
-            _ => todo!(),
+            Self::FromRange => include_str!("Random/fromRange.vm"),
         }
     }
 }
