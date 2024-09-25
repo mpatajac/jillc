@@ -330,7 +330,17 @@ enum JillStdList {
 		List.List,
 	"))]
     Range,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "
+		Math.inc,
+		List.List_tag,
+		List.List_tail,
+	"))]
     Length,
+
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "List.List_tag"))]
     IsEmpty,
     All,
     Any,
@@ -353,6 +363,8 @@ impl JillStdList {
             Self::Fold => include_str!("List/fold.vm"),
             Self::Repeat => include_str!("List/repeat.vm"),
             Self::Range => include_str!("List/range.vm"),
+            Self::Length => include_str!("List/length.vm"),
+            Self::IsEmpty => include_str!("List/isEmpty.vm"),
             _ => todo!(),
         }
     }
