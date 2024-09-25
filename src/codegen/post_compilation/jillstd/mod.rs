@@ -342,6 +342,13 @@ enum JillStdList {
     #[strum(props(Arity = "1"))]
     #[strum(props(Dependencies = "List.List_tag"))]
     IsEmpty,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		List.List_tag,
+		List.List_head,
+		List.List_tail,
+	"))]
     All,
     Any,
     Concat,
@@ -365,6 +372,7 @@ impl JillStdList {
             Self::Range => include_str!("List/range.vm"),
             Self::Length => include_str!("List/length.vm"),
             Self::IsEmpty => include_str!("List/isEmpty.vm"),
+            Self::All => include_str!("List/all.vm"),
             _ => todo!(),
         }
     }
