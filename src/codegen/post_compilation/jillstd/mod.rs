@@ -438,6 +438,8 @@ enum JillStdRandom {
     Random,
 
     // module functions
+    #[strum(props(Arity = "1"))]
+    #[strum(props(Dependencies = "Math.mod"))]
     Next,
     FromRange,
 }
@@ -446,6 +448,7 @@ impl JillStdRandom {
     const fn instructions(self) -> &'static str {
         match self {
             Self::Random => include_str!("Random/Random.vm"),
+            Self::Next => include_str!("Random/next.vm"),
             _ => todo!(),
         }
     }
