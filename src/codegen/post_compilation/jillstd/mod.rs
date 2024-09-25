@@ -322,6 +322,13 @@ enum JillStdList {
 		List.List,
 	"))]
     Repeat,
+
+    #[strum(props(Arity = "2"))]
+    #[strum(props(Dependencies = "
+		Math.dec,
+		List.Empty,
+		List.List,
+	"))]
     Range,
     Length,
     IsEmpty,
@@ -345,6 +352,7 @@ impl JillStdList {
             Self::Filter => include_str!("List/filter.vm"),
             Self::Fold => include_str!("List/fold.vm"),
             Self::Repeat => include_str!("List/repeat.vm"),
+            Self::Range => include_str!("List/range.vm"),
             _ => todo!(),
         }
     }
