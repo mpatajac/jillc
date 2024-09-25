@@ -358,9 +358,6 @@ enum JillStdList {
 		List.List_tail,
 	"))]
     Any,
-    Concat,
-    // TODO?: will it make sense
-    // Zip,
 }
 
 impl JillStdList {
@@ -381,7 +378,6 @@ impl JillStdList {
             Self::IsEmpty => include_str!("List/isEmpty.vm"),
             Self::All => include_str!("List/all.vm"),
             Self::Any => include_str!("List/any.vm"),
-            _ => todo!(),
         }
     }
 }
