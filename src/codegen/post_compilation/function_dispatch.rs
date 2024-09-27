@@ -1,5 +1,6 @@
 use crate::{
     codegen::{
+        common::helpers,
         context::{module::VariableContext, program::FunctionReferenceIndex, ProgramContext},
         error::{Error, FallableInstructions},
         vm,
@@ -115,10 +116,7 @@ fn construct_call(
 
     let dispatch_calls = enumerated_functions
         .map(|(i, (vm_function_name, _))| {
-            let Some(function_arity) = program_context
-                .program_metadata
-                .get_function_arity(vm_function_name)
-            else {
+            let Some(function_arity) = get_function_arity(vm_function_name, program_context) else {
                 return Err(Error::InvalidFunctionReference(
                     vm_function_name.to_string(),
                 ));
@@ -148,6 +146,16 @@ fn construct_call(
         dispatch_calls,
     ]
     .concat())
+}
+
+fn get_function_arity(
+    vm_function_name: &vm::VMFunctionName,
+    program_context: &mut ProgramContext,
+) -> Option<usize> {
+    program_context
+        .program_metadata
+        .get_function_arity(vm_function_name)
+        .map_or_else(|| helpers::jack_api::function_arity(vm_function_name), Some)
 }
 
 #[cfg(test)]
