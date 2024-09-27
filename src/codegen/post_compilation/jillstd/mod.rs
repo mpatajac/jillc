@@ -21,7 +21,7 @@ enum JillStdModule {
     Bool(JillStdBool),
     List(JillStdList),
     Random(JillStdRandom),
-    Fn(JillStdFn),
+    StdUtils(JillStdUtils),
 }
 
 impl JillStdModuleDiscriminants {
@@ -30,7 +30,7 @@ impl JillStdModuleDiscriminants {
             Self::Math => JillStdMath::from_str(function_name).map(JillStdModule::Math),
             Self::Bool => JillStdBool::from_str(function_name).map(JillStdModule::Bool),
             Self::List => JillStdList::from_str(function_name).map(JillStdModule::List),
-            Self::Fn => JillStdFn::from_str(function_name).map(JillStdModule::Fn),
+            Self::StdUtils => JillStdUtils::from_str(function_name).map(JillStdModule::StdUtils),
             Self::Random => JillStdRandom::from_str(function_name).map(JillStdModule::Random),
         }
     }
@@ -42,7 +42,7 @@ impl JillStdModule {
             Self::Math(f) => f.to_string(),
             Self::Bool(f) => f.to_string(),
             Self::List(f) => f.to_string(),
-            Self::Fn(f) => f.to_string(),
+            Self::StdUtils(f) => f.to_string(),
             Self::Random(f) => f.to_string(),
         }
     }
@@ -60,7 +60,7 @@ impl JillStdModule {
             Self::Math(f) => f.instructions(),
             Self::Bool(f) => f.instructions(),
             Self::List(f) => f.instructions(),
-            Self::Fn(f) => f.instructions(),
+            Self::StdUtils(f) => f.instructions(),
             Self::Random(f) => f.instructions(),
         }
     }
@@ -82,7 +82,7 @@ impl JillStdModule {
             Self::Math(f) => f.get_str(enum_attribute),
             Self::Bool(f) => f.get_str(enum_attribute),
             Self::List(f) => f.get_str(enum_attribute),
-            Self::Fn(f) => f.get_str(enum_attribute),
+            Self::StdUtils(f) => f.get_str(enum_attribute),
             Self::Random(f) => f.get_str(enum_attribute),
         }
     }
@@ -384,9 +384,9 @@ impl JillStdList {
 
 // endregion
 
-// region: Fn
+// region: StdUtils
 
-/// List of functions available inside Jill-specific `Fn` standard module.
+/// List of functions available inside Jill-specific `StdUtils` standard module.
 #[derive(
     Debug,
     PartialEq,
@@ -400,15 +400,15 @@ impl JillStdList {
     strum_macros::EnumProperty,
 )]
 #[strum(serialize_all = "camelCase")]
-enum JillStdFn {
+enum JillStdUtils {
     #[strum(props(Arity = "1"))]
     Identity,
 }
 
-impl JillStdFn {
+impl JillStdUtils {
     const fn instructions(self) -> &'static str {
         match self {
-            Self::Identity => include_str!("Fn/identity.vm"),
+            Self::Identity => include_str!("StdUtils/identity.vm"),
         }
     }
 }
@@ -492,8 +492,8 @@ impl JillStdUsageTracker {
                 Self::functions_from_variants(JillStdModule::List),
             ),
             (
-                JillStdModuleDiscriminants::Fn,
-                Self::functions_from_variants(JillStdModule::Fn),
+                JillStdModuleDiscriminants::StdUtils,
+                Self::functions_from_variants(JillStdModule::StdUtils),
             ),
             (
                 JillStdModuleDiscriminants::Random,
