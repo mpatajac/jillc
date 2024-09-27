@@ -196,7 +196,8 @@ pub(super) mod direct_call {
         },
         context::module::FunctionContext,
         error::{FallableAction, FallableInstructions},
-        jillstd, vm,
+        post_compilation::jillstd,
+        vm,
     };
 
     use super::{ast, invalid_function_call, ModuleContext, ProgramContext};

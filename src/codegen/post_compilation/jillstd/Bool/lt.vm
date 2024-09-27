@@ -1,0 +1,5 @@
+function Bool.lt 0
+push argument 0
+push argument 1
+lt
+return

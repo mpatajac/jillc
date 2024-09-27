@@ -314,6 +314,8 @@ fn construct_match(
 
     // region: Construction
 
+    let end_label = module_context.scope.create_label("MATCH_END");
+
     let tag_fn_reference = ast::JillFunctionReference {
         modules_path: function_reference.modules_path.clone(),
         associated_type: function_reference.associated_type.clone(),
@@ -374,11 +376,12 @@ fn construct_match(
         .rev()
         .map(|(expr, label)| {
             Ok([
-                // jump label, followed by variant expression
+                // jump label, followed by variant expression and "end" label
                 vec![vm::label(vm::LabelAction::Label, label)],
                 argument_construction
                     .clone()
                     .construct(expr, module_context, program_context)?,
+                vec![vm::label(vm::LabelAction::Goto, end_label.clone())],
             ]
             .concat())
         })
@@ -387,7 +390,6 @@ fn construct_match(
 
     // endregion
 
-    let end_label = module_context.scope.create_label("MATCH_END");
     let instructions = [
         object_tag_instructions,
         variant_check_instructions,
@@ -711,9 +713,11 @@ mod tests {
             "label VARIANT_1_0",
             "push local 0",
             "call Option.Some_value 1",
+            "goto MATCH_END_0",
             // variant 0
             "label VARIANT_0_0",
             "push constant 0",
+            "goto MATCH_END_0",
             // end
             "label MATCH_END_0",
         ]

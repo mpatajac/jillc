@@ -1,0 +1,5 @@
+function Bool.and 0
+push argument 0
+push argument 1
+and
+return

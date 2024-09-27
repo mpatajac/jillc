@@ -1,0 +1,35 @@
+function List.repeat_repeatRec 0
+label REC_CALL_0
+push argument 2
+push constant 0
+eq
+push constant 0
+eq
+if-goto SKIP_TRUE_0
+push argument 0
+return
+label SKIP_TRUE_0
+push argument 1
+push argument 0
+call List.List 2
+push argument 2
+call Int.dec 1
+pop argument 2
+pop argument 0
+goto REC_CALL_0
+function List.repeat 0
+push argument 1
+push constant 0
+lt
+push constant 0
+eq
+if-goto SKIP_TRUE_0
+push constant 2
+call Sys.error 1
+return
+label SKIP_TRUE_0
+call List.Empty 0
+push argument 0
+push argument 1
+call List.repeat_repeatRec 3
+return

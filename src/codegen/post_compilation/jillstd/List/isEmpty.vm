@@ -1,0 +1,6 @@
+function List.isEmpty 0
+push argument 0
+call List.List_tag 1
+push constant 0
+eq
+return

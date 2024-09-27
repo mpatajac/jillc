@@ -17,6 +17,7 @@ pub fn construct(
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
     let arity = function.arguments.len();
+    let has_captures = !function.captures.is_empty();
 
     let capture_names = function
         .captures
@@ -62,10 +63,12 @@ pub fn construct(
     let vm_function_name = function_reference
         .to_fully_qualified_hack_name(&module_context.module_name, function_context.prefix);
 
-    // add arity (for dispatch)
-    program_context
-        .program_metadata
-        .log_function_arity(vm_function_name.clone(), arity)?;
+    // add metadata (for dispatch)
+    program_context.program_metadata.log_function_metadata(
+        vm_function_name.clone(),
+        arity,
+        has_captures,
+    )?;
 
     // construct nested functions
     let nested_functions_instructions = function
@@ -443,7 +446,7 @@ mod tests {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new("Test".to_owned());
 
-        // fn g x = Math::add(x, 2).
+        // fn g x = Int::add(x, 2).
         let function = JillFunction {
             name: JillIdentifier("g".to_owned()),
             arguments: vec![JillIdentifier("x".to_string())],
@@ -453,7 +456,7 @@ mod tests {
                 local_variables: vec![],
                 return_expression: JillExpression::FunctionCall(JillFunctionCall {
                     reference: JillFunctionReference {
-                        modules_path: vec![JillIdentifier("Math".to_string())],
+                        modules_path: vec![JillIdentifier("Int".to_string())],
                         associated_type: None,
                         function_name: JillIdentifier("add".to_owned()),
                     },
@@ -493,8 +496,8 @@ mod tests {
            fn foo a b =
                fn bar x = Bool::gt(x, 2).
 
-               let c = Math::mult(a, b),
-               let d = Math::sub(c, 6),
+               let c = Int::mult(a, b),
+               let d = Int::sub(c, 6),
 
                ifElse(bar(d), 1, -1).
         */
@@ -531,7 +534,7 @@ mod tests {
                         name: JillIdentifier("c".to_owned()),
                         value: JillExpression::FunctionCall(JillFunctionCall {
                             reference: JillFunctionReference {
-                                modules_path: vec![JillIdentifier("Math".to_owned())],
+                                modules_path: vec![JillIdentifier("Int".to_owned())],
                                 associated_type: None,
                                 function_name: JillIdentifier("mult".to_owned()),
                             },
@@ -545,7 +548,7 @@ mod tests {
                         name: JillIdentifier("d".to_owned()),
                         value: JillExpression::FunctionCall(JillFunctionCall {
                             reference: JillFunctionReference {
-                                modules_path: vec![JillIdentifier("Math".to_owned())],
+                                modules_path: vec![JillIdentifier("Int".to_owned())],
                                 associated_type: None,
                                 function_name: JillIdentifier("sub".to_owned()),
                             },
@@ -589,12 +592,12 @@ mod tests {
             "return",
             // main function
             "function Test.foo 2",
-            // let c = Math::mult(a, b)
+            // let c = Int::mult(a, b)
             "push argument 0",
             "push argument 1",
             "call Math.multiply 2",
             "pop local 0",
-            // let d = Math::sub(c, 6)
+            // let d = Int::sub(c, 6)
             "push local 0",
             "push constant 6",
             "sub",

@@ -1,0 +1,49 @@
+function List.filter_filterRec 0
+label REC_CALL_0
+push argument 1
+call List.List_tag 1
+push constant 0
+eq
+if-goto VARIANT_0_0
+push constant 1
+call Array.new 1
+pop temp 1
+push constant 0
+push temp 1
+add
+push argument 1
+call List.List_head 1
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push argument 2
+push constant 1
+push temp 1
+call Fn._call 3
+push constant 0
+eq
+if-goto SKIP_TRUE_0
+push argument 1
+call List.List_head 1
+push argument 0
+call List.List 2
+goto SKIP_FALSE_0
+label SKIP_TRUE_0
+push argument 0
+label SKIP_FALSE_0
+push argument 1
+call List.List_tail 1
+pop argument 1
+pop argument 0
+goto REC_CALL_0
+label VARIANT_0_0
+push argument 0
+call List.reverse 1
+return
+function List.filter 0
+call List.Empty 0
+push argument 0
+push argument 1
+call List.filter_filterRec 3
+return

@@ -1,0 +1,36 @@
+function Random.next 2
+push argument 0
+pop pointer 0
+push this 2
+push this 1
+call Math.divide 2
+pop local 0
+push this 2
+push this 1
+call Int.mod 2
+pop local 1
+push this 1
+push this 0
+push local 0
+call Int.mod 2
+call Math.multiply 2
+push local 1
+push this 0
+push local 0
+call Math.divide 2
+call Math.multiply 2
+sub
+pop this 0
+push this 0
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 0
+push this 2
+add
+pop this 0
+label IF_FALSE0
+push this 0
+return

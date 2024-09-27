@@ -170,6 +170,10 @@ pub mod output {
         pub const fn new(name: String, content: String) -> Self {
             Self { name, content }
         }
+
+        pub fn content(&self) -> &str {
+            &self.content
+        }
     }
 
     pub struct OutputGenerator {

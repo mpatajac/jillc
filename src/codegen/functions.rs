@@ -40,7 +40,7 @@ mod tests {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new("Test".to_owned());
 
-        // fn f x = Math::add(x, 2).
+        // fn f x = Int::add(x, 2).
         // fn g x = Module::other(x, 7).
         let functions = vec![
             JillFunction {
@@ -52,7 +52,7 @@ mod tests {
                     local_variables: vec![],
                     return_expression: JillExpression::FunctionCall(JillFunctionCall {
                         reference: JillFunctionReference {
-                            modules_path: vec![JillIdentifier("Math".to_string())],
+                            modules_path: vec![JillIdentifier("Int".to_string())],
                             associated_type: None,
                             function_name: JillIdentifier("add".to_owned()),
                         },
@@ -113,7 +113,7 @@ mod tests {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new("Test".to_owned());
 
-        // fn f x = Math::add(x, 2).
+        // fn f x = Int::add(x, 2).
         // fn g x [test] = Module::other(x, test).
         let functions = vec![
             JillFunction {
@@ -125,7 +125,7 @@ mod tests {
                     local_variables: vec![],
                     return_expression: JillExpression::FunctionCall(JillFunctionCall {
                         reference: JillFunctionReference {
-                            modules_path: vec![JillIdentifier("Math".to_string())],
+                            modules_path: vec![JillIdentifier("Int".to_string())],
                             associated_type: None,
                             function_name: JillIdentifier("add".to_owned()),
                         },

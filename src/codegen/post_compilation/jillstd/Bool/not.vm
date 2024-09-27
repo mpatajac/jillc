@@ -1,0 +1,4 @@
+function Bool.not 0
+push argument 0
+not
+return

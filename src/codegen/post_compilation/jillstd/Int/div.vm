@@ -1,0 +1,5 @@
+function Int.div 0
+push argument 0
+push argument 1
+call Math.divide 2
+return
