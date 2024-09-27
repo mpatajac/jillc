@@ -13,7 +13,7 @@ push argument 2
 push argument 0
 call List.List 2
 push argument 2
-call Math.dec 1
+call Int.dec 1
 pop argument 2
 pop argument 0
 goto REC_CALL_0
@@ -21,6 +21,6 @@ function List.range 0
 call List.Empty 0
 push argument 0
 push argument 1
-call Math.dec 1
+call Int.dec 1
 call List.range_rangeRec 3
 return

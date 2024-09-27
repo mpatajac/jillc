@@ -13,7 +13,7 @@ push argument 1
 push argument 0
 call List.List 2
 push argument 2
-call Math.dec 1
+call Int.dec 1
 pop argument 2
 pop argument 0
 goto REC_CALL_0
