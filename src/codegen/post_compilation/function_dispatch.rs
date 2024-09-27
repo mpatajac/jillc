@@ -146,3 +146,142 @@ fn construct_call(
     ]
     .concat()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[allow(clippy::similar_names, clippy::redundant_clone)]
+    #[test]
+    fn test_dispatch_call_construction() {
+        let mut program_context = ProgramContext::new();
+
+        // region: setup
+
+        let foo = vm::VMFunctionName::from_literal("Test.foo");
+        let bar = vm::VMFunctionName::from_literal("Test.bar");
+        let baz = vm::VMFunctionName::from_literal("Test.baz");
+        let biz = vm::VMFunctionName::from_literal("Test.biz");
+
+        // arities
+        assert!(program_context
+            .program_metadata
+            .log_function_arity(foo.clone(), 2)
+            .is_ok());
+
+        assert!(program_context
+            .program_metadata
+            .log_function_arity(bar.clone(), 1)
+            .is_ok());
+
+        assert!(program_context
+            .program_metadata
+            .log_function_arity(baz.clone(), 5)
+            .is_ok());
+
+        assert!(program_context
+            .program_metadata
+            .log_function_arity(biz.clone(), 2)
+            .is_ok());
+
+        // dispatch
+        program_context.function_dispatch.encounter(foo.clone());
+        program_context.function_dispatch.encounter(bar.clone());
+        program_context.function_dispatch.encounter(foo.clone());
+        program_context.function_dispatch.encounter(baz.clone());
+        program_context.function_dispatch.encounter(biz.clone());
+        program_context.function_dispatch.encounter(bar.clone());
+        program_context.function_dispatch.encounter(foo.clone());
+        program_context.function_dispatch.encounter(baz.clone());
+        program_context.function_dispatch.encounter(foo.clone());
+        program_context.function_dispatch.encounter(baz.clone());
+
+        // endregion
+
+        let expected = [
+            "function Fn._call 0",
+            // resolve `this`
+            "push argument 0",
+            "pop pointer 0",
+            // SECTION: push args on stack
+            "push constant 0",
+            "pop temp 7",
+            "label ARGS_INIT_START",
+            // condition check
+            "push temp 7",
+            "push argument 1",
+            "eq",
+            "if-goto ARGS_INIT_END",
+            // loop body
+            "push temp 7",
+            "push argument 2",
+            "add",
+            "pop pointer 1",
+            "push that 0",
+            // i = i + 1
+            "push temp 7",
+            "push constant 1",
+            "add",
+            "pop temp 7",
+            "goto ARGS_INIT_START",
+            "label ARGS_INIT_END",
+            // end SECTION: push args on stack
+            // captures
+            "push this 1",
+            // SECTION: dispatch jumps
+            // foo
+            "push this 0",
+            "push constant 0",
+            "eq",
+            "if-goto FN_0",
+            // baz
+            "push this 0",
+            "push constant 2",
+            "eq",
+            "if-goto FN_1",
+            // bar
+            "push this 0",
+            "push constant 1",
+            "eq",
+            "if-goto FN_2",
+            // biz
+            "push this 0",
+            "push constant 3",
+            "eq",
+            "if-goto FN_3",
+            // "default"
+            "push constant 0",
+            "return",
+            // end SECTION: dispatch jumps
+            // SECTION: dispatch calls
+            // foo
+            "label FN_0",
+            "call Test.foo 3",
+            "return",
+            // baz
+            "label FN_1",
+            "call Test.baz 6",
+            "return",
+            // bar
+            "label FN_2",
+            "call Test.bar 2",
+            "return",
+            // biz
+            "label FN_3",
+            "call Test.biz 3",
+            "return",
+            // end SECTION: dispatch calls
+        ]
+        .join("\n");
+
+        let instructions = construct_call(
+            program_context.function_dispatch.collect(),
+            &mut program_context,
+        );
+
+        assert_eq!(
+            vm::VMInstructionBlock::from(instructions).compile(),
+            expected
+        );
+    }
+}
