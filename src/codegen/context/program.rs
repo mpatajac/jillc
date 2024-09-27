@@ -38,7 +38,7 @@ impl Context {
 
 // region: Function Dispatch
 
-type FunctionReferenceIndex = usize;
+pub type FunctionReferenceIndex = usize;
 type FunctionReferenceCount = usize;
 
 /// Track functions which are used as a first-class object
@@ -70,8 +70,8 @@ impl FunctionDispatch {
 
     /// Return a [Vec] of encountered function references with their indices,
     /// ordered by their reference count.
-    pub fn collect(self) -> Vec<(vm::VMFunctionName, FunctionReferenceIndex)> {
-        let mut items: Vec<_> = self.references.into_iter().collect();
+    pub fn collect(&self) -> Vec<(vm::VMFunctionName, FunctionReferenceIndex)> {
+        let mut items: Vec<_> = self.references.iter().collect();
 
         // sort items by their count, descending
         items.sort_by(|(_, (_, a_count)), (_, (_, b_count))| a_count.cmp(b_count).reverse());
@@ -79,7 +79,7 @@ impl FunctionDispatch {
         // map to (name, index)
         items
             .into_iter()
-            .map(|(name, (idx, _))| (name, idx))
+            .map(|(name, (idx, _))| (name.clone(), *idx))
             .collect()
     }
 }
