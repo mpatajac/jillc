@@ -1,30 +1,31 @@
 use crate::{
     codegen::{
         context::{module::VariableContext, program::FunctionReferenceIndex, ProgramContext},
+        error::{Error, FallableInstructions},
         vm,
     },
     fileio::output::OutputFile,
 };
 
-pub fn construct(program_context: &mut ProgramContext) -> Option<OutputFile> {
+pub fn construct(program_context: &mut ProgramContext) -> Result<Option<OutputFile>, Error> {
     let functions_to_dispatch = program_context.function_dispatch.collect();
 
     if functions_to_dispatch.is_empty() {
         // no functions to dispatch - no need to generate anything
-        return None;
+        return Ok(None);
     }
 
     let instruction_block: vm::VMInstructionBlock = [
         construct_new(),
-        construct_call(functions_to_dispatch, program_context),
+        construct_call(functions_to_dispatch, program_context)?,
     ]
     .concat()
     .into();
 
-    Some(OutputFile::new(
+    Ok(Some(OutputFile::new(
         String::from("Fn"),
         instruction_block.compile(),
-    ))
+    )))
 }
 
 fn construct_new() -> Vec<vm::VMInstruction> {
@@ -49,9 +50,7 @@ fn construct_new() -> Vec<vm::VMInstruction> {
 fn construct_call(
     functions_to_dispatch: Vec<(vm::VMFunctionName, FunctionReferenceIndex)>,
     program_context: &mut ProgramContext,
-) -> Vec<vm::VMInstruction> {
-    // TOOD: test
-
+) -> FallableInstructions {
     // NOTE: since this function is completely unrelated the rest of the program,
     // we will use TEMP 7 (last one) to prevent any possible overwrites (just in case)
     let arg_counter_storage = VariableContext {
@@ -116,24 +115,28 @@ fn construct_call(
 
     let dispatch_calls = enumerated_functions
         .map(|(i, (vm_function_name, _))| {
-            let function_arity = program_context
+            let Some(function_arity) = program_context
                 .program_metadata
                 .get_function_arity(vm_function_name)
-                .expect("arities of all used functions should have been logged");
+            else {
+                return Err(Error::InvalidFunctionReference(
+                    vm_function_name.to_string(),
+                ));
+            };
 
-            vec![
+            Ok(vec![
                 // jump label
                 vm::label(vm::LabelAction::Label, format!("FN_{i}")),
                 // directly call associated function
                 // NOTE: call with `arity` + 1 arguments (for captures array)
                 vm::call(vm_function_name.clone(), function_arity + 1),
                 vm::vm_return(),
-            ]
+            ])
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>, _>>()?
         .concat();
 
-    [
+    Ok([
         vec![vm::function(vm_function_name, 0)],
         closure_as_this,
         arguments_construction,
@@ -144,7 +147,7 @@ fn construct_call(
         vec![vm::push(vm::Segment::Constant, 0), vm::vm_return()],
         dispatch_calls,
     ]
-    .concat()
+    .concat())
 }
 
 #[cfg(test)]
@@ -274,14 +277,12 @@ mod tests {
         ]
         .join("\n");
 
-        let instructions = construct_call(
+        assert!(construct_call(
             program_context.function_dispatch.collect(),
             &mut program_context,
-        );
-
-        assert_eq!(
-            vm::VMInstructionBlock::from(instructions).compile(),
-            expected
-        );
+        )
+        .is_ok_and(
+            |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+        ));
     }
 }
