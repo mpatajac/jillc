@@ -38,7 +38,7 @@ impl Context {
 
 // region: Function Dispatch
 
-type FunctionReferenceIndex = usize;
+pub type FunctionReferenceIndex = usize;
 type FunctionReferenceCount = usize;
 
 /// Track functions which are used as a first-class object
@@ -70,8 +70,8 @@ impl FunctionDispatch {
 
     /// Return a [Vec] of encountered function references with their indices,
     /// ordered by their reference count.
-    pub fn collect(self) -> Vec<(vm::VMFunctionName, FunctionReferenceIndex)> {
-        let mut items: Vec<_> = self.references.into_iter().collect();
+    pub fn collect(&self) -> Vec<(vm::VMFunctionName, FunctionReferenceIndex)> {
+        let mut items: Vec<_> = self.references.iter().collect();
 
         // sort items by their count, descending
         items.sort_by(|(_, (_, a_count)), (_, (_, b_count))| a_count.cmp(b_count).reverse());
@@ -79,7 +79,7 @@ impl FunctionDispatch {
         // map to (name, index)
         items
             .into_iter()
-            .map(|(name, (idx, _))| (name, idx))
+            .map(|(name, (idx, _))| (name.clone(), *idx))
             .collect()
     }
 }
@@ -90,30 +90,26 @@ impl FunctionDispatch {
 
 #[derive(Debug)]
 pub struct JillProgramMetadata {
-    top_level_function_arities: HashMap<vm::VMFunctionName, usize>,
+    function_arities: HashMap<vm::VMFunctionName, usize>,
 }
 
 impl JillProgramMetadata {
     pub fn new() -> Self {
         Self {
-            top_level_function_arities: HashMap::new(),
+            function_arities: HashMap::new(),
         }
     }
 
     pub fn log_function_arity(&mut self, name: vm::VMFunctionName, arity: usize) -> FallableAction {
-        if self
-            .top_level_function_arities
-            .insert(name.clone(), arity)
-            .is_some()
-        {
+        if self.function_arities.insert(name.clone(), arity).is_some() {
             Err(Error::MultipleFunctionDefinitions(name))
         } else {
             Ok(())
         }
     }
 
-    pub fn get_function_arity(&self, name: vm::VMFunctionName) -> Option<usize> {
-        self.top_level_function_arities.get(&name).copied()
+    pub fn get_function_arity(&self, name: &vm::VMFunctionName) -> Option<usize> {
+        self.function_arities.get(name).copied()
     }
 }
 
@@ -191,13 +187,13 @@ mod tests {
 
         // existing function
         assert_eq!(
-            program_metadata.get_function_arity(vm::VMFunctionName::from_literal("Foo.bar")),
+            program_metadata.get_function_arity(&vm::VMFunctionName::from_literal("Foo.bar")),
             Some(1)
         );
 
         // non-existing function
         assert!(program_metadata
-            .get_function_arity(vm::VMFunctionName::from_literal("Foo.baz"))
+            .get_function_arity(&vm::VMFunctionName::from_literal("Foo.baz"))
             .is_none());
 
         // duplicate function log

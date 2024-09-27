@@ -56,6 +56,13 @@ fn apply_post_compilation_generation(
         output_generator.generate(jillstd_module_output)?;
     }
 
+    // fn dispatch
+    if let Some(fn_dispatch_output) =
+        post_compilation::function_dispatch::construct(program_context)?
+    {
+        output_generator.generate(fn_dispatch_output)?;
+    }
+
     Ok(())
 }
 
