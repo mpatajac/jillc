@@ -607,7 +607,12 @@ pub fn construct(program_context: &mut ProgramContext) -> impl Iterator<Item = O
 
                     program_context
                         .program_metadata
-                        .log_function_arity(vm_function_name, module_function.function_arity())
+                        .log_function_metadata(
+                            vm_function_name,
+                            module_function.function_arity(),
+                            // JillStd functions have no captures
+                            false,
+                        )
                         .expect("should be a valid JillStd function");
 
                     // map to compiled VM

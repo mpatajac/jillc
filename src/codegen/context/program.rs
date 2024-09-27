@@ -88,28 +88,48 @@ impl FunctionDispatch {
 
 // region: Program metadata
 
+#[derive(Debug, Clone, Copy)]
+pub struct JillFunctionMetadata {
+    pub arity: usize,
+    pub has_captures: bool,
+}
+
 #[derive(Debug)]
 pub struct JillProgramMetadata {
-    function_arities: HashMap<vm::VMFunctionName, usize>,
+    metadata: HashMap<vm::VMFunctionName, JillFunctionMetadata>,
 }
 
 impl JillProgramMetadata {
     pub fn new() -> Self {
         Self {
-            function_arities: HashMap::new(),
+            metadata: HashMap::new(),
         }
     }
 
-    pub fn log_function_arity(&mut self, name: vm::VMFunctionName, arity: usize) -> FallableAction {
-        if self.function_arities.insert(name.clone(), arity).is_some() {
+    pub fn log_function_metadata(
+        &mut self,
+        name: vm::VMFunctionName,
+        arity: usize,
+        has_captures: bool,
+    ) -> FallableAction {
+        let function_metadata = JillFunctionMetadata {
+            arity,
+            has_captures,
+        };
+
+        if self
+            .metadata
+            .insert(name.clone(), function_metadata)
+            .is_some()
+        {
             Err(Error::MultipleFunctionDefinitions(name))
         } else {
             Ok(())
         }
     }
 
-    pub fn get_function_arity(&self, name: &vm::VMFunctionName) -> Option<usize> {
-        self.function_arities.get(name).copied()
+    pub fn get_function_metadata(&self, name: &vm::VMFunctionName) -> Option<JillFunctionMetadata> {
+        self.metadata.get(name).copied()
     }
 }
 
@@ -174,31 +194,30 @@ mod tests {
 
         // setup
         assert!(program_metadata
-            .log_function_arity(vm::VMFunctionName::from_literal("Foo.foo"), 2)
+            .log_function_metadata(vm::VMFunctionName::from_literal("Foo.foo"), 2, false)
             .is_ok());
 
         assert!(program_metadata
-            .log_function_arity(vm::VMFunctionName::from_literal("Foo.bar"), 1)
+            .log_function_metadata(vm::VMFunctionName::from_literal("Foo.bar"), 1, true)
             .is_ok());
 
         assert!(program_metadata
-            .log_function_arity(vm::VMFunctionName::from_literal("Bar.bar"), 4)
+            .log_function_metadata(vm::VMFunctionName::from_literal("Bar.bar"), 4, false)
             .is_ok());
 
         // existing function
-        assert_eq!(
-            program_metadata.get_function_arity(&vm::VMFunctionName::from_literal("Foo.bar")),
-            Some(1)
-        );
+        assert!(program_metadata
+            .get_function_metadata(&vm::VMFunctionName::from_literal("Foo.bar"))
+            .is_some_and(|metadata| metadata.arity == 1 && metadata.has_captures));
 
         // non-existing function
         assert!(program_metadata
-            .get_function_arity(&vm::VMFunctionName::from_literal("Foo.baz"))
+            .get_function_metadata(&vm::VMFunctionName::from_literal("Foo.baz"))
             .is_none());
 
         // duplicate function log
         assert!(program_metadata
-            .log_function_arity(vm::VMFunctionName::from_literal("Bar.bar"), 4)
+            .log_function_metadata(vm::VMFunctionName::from_literal("Bar.bar"), 4, false)
             .is_err_and(|err| matches!(err, Error::MultipleFunctionDefinitions(_))));
     }
 }

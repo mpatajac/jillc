@@ -1,7 +1,11 @@
 use crate::{
     codegen::{
         common::helpers,
-        context::{module::VariableContext, program::FunctionReferenceIndex, ProgramContext},
+        context::{
+            module::VariableContext,
+            program::{FunctionReferenceIndex, JillFunctionMetadata},
+            ProgramContext,
+        },
         error::{Error, FallableInstructions},
         vm,
     },
@@ -96,6 +100,17 @@ fn construct_call(
         vm::label(vm::LabelAction::Label, "ARGS_INIT_END"),
     ];
 
+    let captures = vec![
+        // check if captures array is NULL
+        vm::push(vm::Segment::This, 1),
+        vm::null(),
+        vm::command(vm::VMCommand::Eq),
+        // if it is NULL, don't push it onto the stack
+        vm::label(vm::LabelAction::IfGoto, "SKIP_CAPTURES"),
+        vm::push(vm::Segment::This, 1),
+        vm::label(vm::LabelAction::Label, "SKIP_CAPTURES"),
+    ];
+
     let enumerated_functions = functions_to_dispatch.iter().enumerate();
 
     let dispatch_jumps = enumerated_functions
@@ -116,18 +131,23 @@ fn construct_call(
 
     let dispatch_calls = enumerated_functions
         .map(|(i, (vm_function_name, _))| {
-            let Some(function_arity) = get_function_arity(vm_function_name, program_context) else {
+            let Some(function_metadata) = get_function_metadata(vm_function_name, program_context)
+            else {
                 return Err(Error::InvalidFunctionReference(
                     vm_function_name.to_string(),
                 ));
             };
 
+            // if function has captures, call it with
+            // one extra argument (captures array)
+            let call_argument_count =
+                function_metadata.arity + usize::from(function_metadata.has_captures);
+
             Ok(vec![
                 // jump label
                 vm::label(vm::LabelAction::Label, format!("FN_{i}")),
                 // directly call associated function
-                // NOTE: call with `arity` + 1 arguments (for captures array)
-                vm::call(vm_function_name.clone(), function_arity + 1),
+                vm::call(vm_function_name.clone(), call_argument_count),
                 vm::vm_return(),
             ])
         })
@@ -138,8 +158,7 @@ fn construct_call(
         vec![vm::function(vm_function_name, 0)],
         closure_as_this,
         arguments_construction,
-        // captures
-        vec![vm::push(vm::Segment::This, 1)],
+        captures,
         dispatch_jumps,
         // "default" (no fid-s matched)
         vec![vm::push(vm::Segment::Constant, 0), vm::vm_return()],
@@ -148,14 +167,14 @@ fn construct_call(
     .concat())
 }
 
-fn get_function_arity(
+fn get_function_metadata(
     vm_function_name: &vm::VMFunctionName,
     program_context: &mut ProgramContext,
-) -> Option<usize> {
+) -> Option<JillFunctionMetadata> {
     program_context
         .program_metadata
-        .get_function_arity(vm_function_name)
-        .or_else(|| helpers::jack_api::function_arity(vm_function_name))
+        .get_function_metadata(vm_function_name)
+        .map_or_else(|| helpers::jack_api::function_arity(vm_function_name), Some)
 }
 
 #[cfg(test)]
@@ -177,22 +196,22 @@ mod tests {
         // arities
         assert!(program_context
             .program_metadata
-            .log_function_arity(foo.clone(), 2)
+            .log_function_metadata(foo.clone(), 2, false)
             .is_ok());
 
         assert!(program_context
             .program_metadata
-            .log_function_arity(bar.clone(), 1)
+            .log_function_metadata(bar.clone(), 1, true)
             .is_ok());
 
         assert!(program_context
             .program_metadata
-            .log_function_arity(baz.clone(), 5)
+            .log_function_metadata(baz.clone(), 5, false)
             .is_ok());
 
         assert!(program_context
             .program_metadata
-            .log_function_arity(biz.clone(), 2)
+            .log_function_metadata(biz.clone(), 2, false)
             .is_ok());
 
         // dispatch
@@ -239,6 +258,11 @@ mod tests {
             // end SECTION: push args on stack
             // captures
             "push this 1",
+            "push constant 0",
+            "eq",
+            "if-goto SKIP_CAPTURES",
+            "push this 1",
+            "label SKIP_CAPTURES",
             // SECTION: dispatch jumps
             // foo
             "push this 0",
@@ -267,11 +291,11 @@ mod tests {
             // SECTION: dispatch calls
             // foo
             "label FN_0",
-            "call Test.foo 3",
+            "call Test.foo 2",
             "return",
             // baz
             "label FN_1",
-            "call Test.baz 6",
+            "call Test.baz 5",
             "return",
             // bar
             "label FN_2",
@@ -279,7 +303,7 @@ mod tests {
             "return",
             // biz
             "label FN_3",
-            "call Test.biz 3",
+            "call Test.biz 2",
             "return",
             // end SECTION: dispatch calls
         ]

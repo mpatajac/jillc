@@ -261,9 +261,12 @@ mod variant {
         arity: usize,
         program_context: &mut ProgramContext,
     ) -> FallableAction {
-        program_context
-            .program_metadata
-            .log_function_arity(vm_function_name.clone(), arity)
+        program_context.program_metadata.log_function_metadata(
+            vm_function_name.clone(),
+            arity,
+            // type-associated functions have no captures
+            false,
+        )
     }
 
     fn ctor_name(
@@ -384,8 +387,8 @@ mod tests {
         // function arity added to program metadata
         assert!(program_context
             .program_metadata
-            .get_function_arity(&vm::VMFunctionName::construct("Bar", "", "Bar_updateFoo1"))
-            .is_some_and(|arity| arity == 2));
+            .get_function_metadata(&vm::VMFunctionName::construct("Bar", "", "Bar_updateFoo1"))
+            .is_some_and(|metadata| metadata.arity == 2 && !metadata.has_captures));
 
         // `tag` function NOT in scope
         assert!(module_context

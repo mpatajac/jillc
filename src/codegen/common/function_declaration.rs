@@ -17,6 +17,7 @@ pub fn construct(
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
     let arity = function.arguments.len();
+    let has_captures = !function.captures.is_empty();
 
     let capture_names = function
         .captures
@@ -62,10 +63,12 @@ pub fn construct(
     let vm_function_name = function_reference
         .to_fully_qualified_hack_name(&module_context.module_name, function_context.prefix);
 
-    // add arity (for dispatch)
-    program_context
-        .program_metadata
-        .log_function_arity(vm_function_name.clone(), arity)?;
+    // add metadata (for dispatch)
+    program_context.program_metadata.log_function_metadata(
+        vm_function_name.clone(),
+        arity,
+        has_captures,
+    )?;
 
     // construct nested functions
     let nested_functions_instructions = function

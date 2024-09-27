@@ -1,10 +1,8 @@
 use phf::phf_map;
 
-use crate::codegen::vm;
+use crate::codegen::{context::program::JillFunctionMetadata, vm};
 
-type Arity = usize;
-
-static ARITIES: phf::Map<&'static str, Arity> = phf_map! {
+static ARITIES: phf::Map<&'static str, usize> = phf_map! {
     // we can skip `Math`, since all of those functions
     // are handled internally in JillStd
 
@@ -60,6 +58,13 @@ static ARITIES: phf::Map<&'static str, Arity> = phf_map! {
     "Sys.wait" => 1,
 };
 
-pub fn function_arity(vm_function_name: &vm::VMFunctionName) -> Option<Arity> {
-    ARITIES.get(&vm_function_name.to_string()).copied()
+pub fn function_arity(vm_function_name: &vm::VMFunctionName) -> Option<JillFunctionMetadata> {
+    ARITIES
+        .get(&vm_function_name.to_string())
+        .copied()
+        .map(|arity| JillFunctionMetadata {
+            arity,
+            // Jack API functions have no captures
+            has_captures: false,
+        })
 }
