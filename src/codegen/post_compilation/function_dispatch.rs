@@ -155,7 +155,7 @@ fn get_function_arity(
     program_context
         .program_metadata
         .get_function_arity(vm_function_name)
-        .map_or_else(|| helpers::jack_api::function_arity(vm_function_name), Some)
+        .or_else(|| helpers::jack_api::function_arity(vm_function_name))
 }
 
 #[cfg(test)]
