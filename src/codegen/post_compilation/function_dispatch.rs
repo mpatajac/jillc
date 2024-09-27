@@ -28,7 +28,22 @@ pub fn construct(program_context: &mut ProgramContext) -> Option<OutputFile> {
 }
 
 fn construct_new() -> Vec<vm::VMInstruction> {
-    todo!()
+    vec![
+        vm::function(vm::VMFunctionName::from_literal("Fn._new"), 0),
+        // we store two fields in closure object
+        vm::push(vm::Segment::Constant, 2),
+        vm::call(vm::VMFunctionName::from_literal("Memory.alloc"), 1),
+        vm::pop(vm::Segment::Pointer, 0),
+        // fid
+        vm::push(vm::Segment::Argument, 0),
+        vm::pop(vm::Segment::This, 0),
+        // captures array
+        vm::push(vm::Segment::Argument, 1),
+        vm::pop(vm::Segment::This, 1),
+        // return constructed object
+        vm::push(vm::Segment::Pointer, 0),
+        vm::vm_return(),
+    ]
 }
 
 fn construct_call(
