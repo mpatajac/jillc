@@ -1,4 +1,4 @@
-function Math.mod 0
+function Int.mod 0
 push argument 0
 push argument 0
 push argument 1

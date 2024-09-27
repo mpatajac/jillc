@@ -1,5 +1,5 @@
-function Math.div 0
+function Int.add 0
 push argument 0
 push argument 1
-call Math.divide 2
+add
 return

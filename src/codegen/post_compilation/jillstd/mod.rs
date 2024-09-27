@@ -17,7 +17,7 @@ use crate::{
 #[strum(serialize_all = "PascalCase")]
 #[strum_discriminants(derive(Hash, strum::EnumString, strum::Display))]
 enum JillStdModule {
-    Math(JillStdMath),
+    Int(JillStdInt),
     Bool(JillStdBool),
     List(JillStdList),
     Random(JillStdRandom),
@@ -27,7 +27,7 @@ enum JillStdModule {
 impl JillStdModuleDiscriminants {
     fn to_std_module(self, function_name: &str) -> Result<JillStdModule, strum::ParseError> {
         match self {
-            Self::Math => JillStdMath::from_str(function_name).map(JillStdModule::Math),
+            Self::Int => JillStdInt::from_str(function_name).map(JillStdModule::Int),
             Self::Bool => JillStdBool::from_str(function_name).map(JillStdModule::Bool),
             Self::List => JillStdList::from_str(function_name).map(JillStdModule::List),
             Self::StdUtils => JillStdUtils::from_str(function_name).map(JillStdModule::StdUtils),
@@ -39,7 +39,7 @@ impl JillStdModuleDiscriminants {
 impl JillStdModule {
     fn function_name(self) -> String {
         match self {
-            Self::Math(f) => f.to_string(),
+            Self::Int(f) => f.to_string(),
             Self::Bool(f) => f.to_string(),
             Self::List(f) => f.to_string(),
             Self::StdUtils(f) => f.to_string(),
@@ -57,7 +57,7 @@ impl JillStdModule {
     const fn instructions(self) -> &'static str {
         // TODO: figure out if there is a more elegant way to do this (proc macro?)
         match self {
-            Self::Math(f) => f.instructions(),
+            Self::Int(f) => f.instructions(),
             Self::Bool(f) => f.instructions(),
             Self::List(f) => f.instructions(),
             Self::StdUtils(f) => f.instructions(),
@@ -79,7 +79,7 @@ impl JillStdModule {
 
     fn get_attribute(self, enum_attribute: &str) -> Option<&'static str> {
         match self {
-            Self::Math(f) => f.get_str(enum_attribute),
+            Self::Int(f) => f.get_str(enum_attribute),
             Self::Bool(f) => f.get_str(enum_attribute),
             Self::List(f) => f.get_str(enum_attribute),
             Self::StdUtils(f) => f.get_str(enum_attribute),
@@ -107,9 +107,9 @@ fn jillstd_literal_to_function_reference(literal: &str) -> ast::JillFunctionRefe
     }
 }
 
-// region: Math
+// region: Int
 
-/// List of functions available inside Jill-specific `Math` standard module.
+/// List of functions available inside Jill-specific `Int` standard module.
 #[derive(
     Debug,
     PartialEq,
@@ -123,7 +123,7 @@ fn jillstd_literal_to_function_reference(literal: &str) -> ast::JillFunctionRefe
     strum_macros::EnumProperty,
 )]
 #[strum(serialize_all = "camelCase")]
-enum JillStdMath {
+enum JillStdInt {
     /// `+`
     #[strum(props(Arity = "2"))]
     Add,
@@ -154,16 +154,16 @@ enum JillStdMath {
     Sqrt,
 }
 
-impl JillStdMath {
+impl JillStdInt {
     const fn instructions(self) -> &'static str {
         match self {
-            Self::Add => include_str!("Math/add.vm"),
-            Self::Sub => include_str!("Math/sub.vm"),
-            Self::Mult => include_str!("Math/mult.vm"),
-            Self::Div => include_str!("Math/div.vm"),
-            Self::Mod => include_str!("Math/mod.vm"),
-            Self::Inc => include_str!("Math/inc.vm"),
-            Self::Dec => include_str!("Math/dec.vm"),
+            Self::Add => include_str!("Int/add.vm"),
+            Self::Sub => include_str!("Int/sub.vm"),
+            Self::Mult => include_str!("Int/mult.vm"),
+            Self::Div => include_str!("Int/div.vm"),
+            Self::Mod => include_str!("Int/mod.vm"),
+            Self::Inc => include_str!("Int/inc.vm"),
+            Self::Dec => include_str!("Int/dec.vm"),
             // Jack API overrides - no need to generate anything
             Self::Min | Self::Max | Self::Sqrt => "",
         }
@@ -317,7 +317,7 @@ enum JillStdList {
 
     #[strum(props(Arity = "2"))]
     #[strum(props(Dependencies = "
-		Math.dec,
+		Int.dec,
 		List.Empty,
 		List.List,
 	"))]
@@ -325,7 +325,7 @@ enum JillStdList {
 
     #[strum(props(Arity = "2"))]
     #[strum(props(Dependencies = "
-		Math.dec,
+		Int.dec,
 		List.Empty,
 		List.List,
 	"))]
@@ -333,7 +333,7 @@ enum JillStdList {
 
     #[strum(props(Arity = "1"))]
     #[strum(props(Dependencies = "
-		Math.inc,
+		Int.inc,
 		List.List_tag,
 		List.List_tail,
 	"))]
@@ -439,12 +439,12 @@ enum JillStdRandom {
 
     // module functions
     #[strum(props(Arity = "1"))]
-    #[strum(props(Dependencies = "Math.mod"))]
+    #[strum(props(Dependencies = "Int.mod"))]
     Next,
 
     #[strum(props(Arity = "3"))]
     #[strum(props(Dependencies = "
-		Math.mod,
+		Int.mod,
 		Random.next
 	"))]
     FromRange,
@@ -480,8 +480,8 @@ impl JillStdUsageTracker {
     pub fn new() -> Self {
         let jillstd = [
             (
-                JillStdModuleDiscriminants::Math,
-                Self::functions_from_variants(JillStdModule::Math),
+                JillStdModuleDiscriminants::Int,
+                Self::functions_from_variants(JillStdModule::Int),
             ),
             (
                 JillStdModuleDiscriminants::Bool,
