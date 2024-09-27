@@ -3,8 +3,12 @@ use phf::phf_map;
 use crate::codegen::{context::program::JillFunctionMetadata, vm};
 
 static ARITIES: phf::Map<&'static str, usize> = phf_map! {
-    // we can skip `Math`, since all of those functions
-    // are handled internally in JillStd
+    // Math
+    "Math.multiply" => 2,
+    "Math.divide" => 2,
+    "Math.min" => 2,
+    "Math.max" => 2,
+    "Math.sqrt" => 1,
 
     // String
     "String.new" => 1,

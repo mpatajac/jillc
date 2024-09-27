@@ -27,6 +27,9 @@ static OVERRIDES: phf::Map<&'static str, FunctionOverrideKind> = phf_map! {
     // JackStd
     "Int.mult" => FunctionOverrideKind::JackStd("Math", "multiply"),
     "Int.div" => FunctionOverrideKind::JackStd("Math", "divide"),
+    "Int.min" => FunctionOverrideKind::JackStd("Math", "min"),
+    "Int.max" => FunctionOverrideKind::JackStd("Math", "max"),
+    "Int.sqrt" => FunctionOverrideKind::JackStd("Math", "sqrt"),
 };
 
 pub fn find_override(

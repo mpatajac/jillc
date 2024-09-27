@@ -1,0 +1,4 @@
+function Int.sqrt 0
+push argument 0
+call Math.sqrt 1
+return

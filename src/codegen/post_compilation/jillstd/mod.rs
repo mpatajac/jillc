@@ -164,8 +164,9 @@ impl JillStdInt {
             Self::Mod => include_str!("Int/mod.vm"),
             Self::Inc => include_str!("Int/inc.vm"),
             Self::Dec => include_str!("Int/dec.vm"),
-            // Jack API overrides - no need to generate anything
-            Self::Min | Self::Max | Self::Sqrt => "",
+            Self::Min => include_str!("Int/min.vm"),
+            Self::Max => include_str!("Int/max.vm"),
+            Self::Sqrt => include_str!("Int/sqrt.vm"),
         }
     }
 }

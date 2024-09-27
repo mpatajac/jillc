@@ -1,0 +1,5 @@
+function Int.max 0
+push argument 0
+push argument 1
+call Math.max 2
+return
