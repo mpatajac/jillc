@@ -90,30 +90,26 @@ impl FunctionDispatch {
 
 #[derive(Debug)]
 pub struct JillProgramMetadata {
-    top_level_function_arities: HashMap<vm::VMFunctionName, usize>,
+    function_arities: HashMap<vm::VMFunctionName, usize>,
 }
 
 impl JillProgramMetadata {
     pub fn new() -> Self {
         Self {
-            top_level_function_arities: HashMap::new(),
+            function_arities: HashMap::new(),
         }
     }
 
     pub fn log_function_arity(&mut self, name: vm::VMFunctionName, arity: usize) -> FallableAction {
-        if self
-            .top_level_function_arities
-            .insert(name.clone(), arity)
-            .is_some()
-        {
+        if self.function_arities.insert(name.clone(), arity).is_some() {
             Err(Error::MultipleFunctionDefinitions(name))
         } else {
             Ok(())
         }
     }
 
-    pub fn get_function_arity(&self, name: vm::VMFunctionName) -> Option<usize> {
-        self.top_level_function_arities.get(&name).copied()
+    pub fn get_function_arity(&self, name: &vm::VMFunctionName) -> Option<usize> {
+        self.function_arities.get(name).copied()
     }
 }
 
@@ -191,13 +187,13 @@ mod tests {
 
         // existing function
         assert_eq!(
-            program_metadata.get_function_arity(vm::VMFunctionName::from_literal("Foo.bar")),
+            program_metadata.get_function_arity(&vm::VMFunctionName::from_literal("Foo.bar")),
             Some(1)
         );
 
         // non-existing function
         assert!(program_metadata
-            .get_function_arity(vm::VMFunctionName::from_literal("Foo.baz"))
+            .get_function_arity(&vm::VMFunctionName::from_literal("Foo.baz"))
             .is_none());
 
         // duplicate function log
