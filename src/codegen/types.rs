@@ -98,12 +98,10 @@ mod variant {
 
         let variant_tag = module_context.type_info.current_variant;
         let vm_function_name = ctor_name(variant, module_context);
+        let arity = variant_arity(variant);
 
-        add_function_to_scope(
-            variant.name.0.clone(),
-            variant_arity(variant),
-            module_context,
-        )?;
+        add_function_to_scope(variant.name.0.clone(), arity, module_context)?;
+        log_function_arity(&vm_function_name, arity, program_context)?;
 
         let field_assignment = |i: usize| {
             vec![
@@ -158,6 +156,7 @@ mod variant {
             let arity = 1;
             let module_free_function_name = function_reference.type_associated_function_name();
             add_function_to_scope(module_free_function_name, arity, module_context)?;
+            log_function_arity(&vm_function_name, arity, program_context)?;
 
             let output_block = vec![
                 vm::function(vm::VMFunctionName::from_literal(&vm_function_name), 0),
@@ -205,6 +204,7 @@ mod variant {
             let arity = 2;
             let module_free_function_name = function_reference.type_associated_function_name();
             add_function_to_scope(module_free_function_name, arity, module_context)?;
+            log_function_arity(&vm_function_name, arity, program_context)?;
 
             let ctor_arg_mapping = |i| {
                 if i == variant_index {
@@ -252,6 +252,18 @@ mod variant {
         module_context.scope.leave_function();
 
         Ok(())
+    }
+
+    /// Functions are created here implicitly so function declaration
+    /// won't automatically log arity - we have to do it manually.
+    fn log_function_arity(
+        vm_function_name: &vm::VMFunctionName,
+        arity: usize,
+        program_context: &mut ProgramContext,
+    ) -> FallableAction {
+        program_context
+            .program_metadata
+            .log_function_arity(vm_function_name.clone(), arity)
     }
 
     fn ctor_name(
@@ -368,6 +380,12 @@ mod tests {
             .scope
             .search_function(&String::from("Bar_updateFoo1"))
             .is_some());
+
+        // function arity added to program metadata
+        assert!(program_context
+            .program_metadata
+            .get_function_arity(&vm::VMFunctionName::construct("Bar", "", "Bar_updateFoo1"))
+            .is_some_and(|arity| arity == 2));
 
         // `tag` function NOT in scope
         assert!(module_context
