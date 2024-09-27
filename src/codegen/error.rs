@@ -17,6 +17,15 @@ pub enum Error {
     DiscardInGlobal,
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO!: implement
+        write!(f, "ERROR")
+    }
+}
+
+impl std::error::Error for Error {}
+
 pub type FallableAction = Result<(), Error>;
 pub type FallableInstructions = Result<Vec<vm::VMInstruction>, Error>;
 pub type FallableOutputFile = Result<fileio::output::OutputFile, Error>;
