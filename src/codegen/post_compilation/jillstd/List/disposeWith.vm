@@ -1,0 +1,35 @@
+function List.disposeWith 2
+label REC_CALL
+push argument 0
+pop pointer 0
+push constant 1
+call Array.new 1
+push this 1
+pop temp 1
+pop pointer 1
+push temp 1
+pop that 0
+push argument 1
+push constant 1
+push temp 2
+call Fn._call 3
+pop temp 0
+push this 0
+pop local 0
+push this 2
+pop local 1
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push local 0
+push constant 0
+eq
+not
+if-goto SKIP_TRUE
+push argument 1
+call Fn.dispose 1
+return
+label SKIP_TRUE
+push local 1
+pop argument 0
+goto REC_CALL
