@@ -81,6 +81,9 @@ pub(super) fn construct_with_custom_argument_construction(
         CompilerInternalFunction::Todo => {
             construct_todo(function_call, module_context, program_context)
         }
+        CompilerInternalFunction::Free => {
+            construct_free(function_call, module_context, program_context)
+        }
     }
 }
 
@@ -443,6 +446,64 @@ fn construct_todo(
     Ok(instructions)
 }
 
+fn construct_free(
+    function_call: &ast::JillFunctionCall,
+    module_context: &mut ModuleContext,
+    program_context: &mut ProgramContext,
+) -> FallableInstructions {
+    let function_reference = &function_call.reference;
+
+    // region: Validation
+
+    // `free` cannot be preceded (have module path or associated type)
+    if is_preceded(function_reference) {
+        return invalid_compiler_internal_function_call(function_reference);
+    }
+
+    // `free` MUST contain AT LEAST 1 argument -
+    // variables to dispose
+    if function_call.arguments.is_empty() {
+        return invalid_compiler_internal_function_call(function_reference);
+    }
+
+    // check that the arguments are variables
+    if !function_call.arguments.iter().all(is_variable) {
+        return invalid_compiler_internal_function_call(function_reference);
+    }
+
+    // endregion
+
+    // region: Construction
+
+    // add `pop temp {i}` after every call to discard result
+    let temp_index = program_context.temp_segment_index.request();
+
+    let instructions = function_call
+        .arguments
+        .iter()
+        .map(|expr| {
+            Ok([
+                // add variable to stack
+                expression::construct(expr, module_context, program_context)?,
+                vec![
+                    // dispose
+                    vm::call(vm::VMFunctionName::from_literal("Memory.deAlloc"), 1),
+                    // discard result
+                    vm::pop(vm::Segment::Temp, temp_index),
+                ],
+            ]
+            .concat())
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .concat();
+
+    program_context.temp_segment_index.release();
+
+    // endregion
+
+    Ok(instructions)
+}
+
 // region: Helpers
 
 fn is_module_preceded(function_reference: &ast::JillFunctionReference) -> bool {
@@ -459,6 +520,10 @@ fn is_preceded(function_reference: &ast::JillFunctionReference) -> bool {
 
 fn is_function_call(expr: &ast::JillExpression) -> bool {
     matches!(expr, ast::JillExpression::FunctionCall(_))
+}
+
+fn is_variable(expr: &ast::JillExpression) -> bool {
+    matches!(expr, ast::JillExpression::VariableName(_))
 }
 
 fn is_string(expr: &ast::JillExpression) -> bool {
@@ -776,6 +841,63 @@ mod tests {
         };
 
         let expected = ["push constant 0", "call Sys.error 1"].join("\n");
+
+        assert!(function_call::construct(
+            &function_call,
+            &mut module_context,
+            &mut program_context
+        )
+        .is_ok_and(
+            |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+        ));
+    }
+
+    #[test]
+    fn test_free_call() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        // `free(foo, bar)`
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("foo"),
+                VariableContextArguments::new(vm::Segment::Local),
+            )
+            .is_ok());
+
+        assert!(module_context
+            .scope
+            .add_variable(
+                String::from("bar"),
+                VariableContextArguments::new(vm::Segment::Local),
+            )
+            .is_ok());
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("free")),
+        };
+        let arguments = vec![
+            ast::JillExpression::VariableName(ast::JillIdentifier(String::from("foo"))),
+            ast::JillExpression::VariableName(ast::JillIdentifier(String::from("bar"))),
+        ];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = [
+            "push local 0",
+            "call Memory.deAlloc 1",
+            "pop temp 0",
+            "push local 1",
+            "call Memory.deAlloc 1",
+            "pop temp 0",
+        ]
+        .join("\n");
 
         assert!(function_call::construct(
             &function_call,
