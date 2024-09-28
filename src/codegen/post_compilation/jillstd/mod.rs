@@ -622,6 +622,12 @@ pub fn construct(program_context: &mut ProgramContext) -> impl Iterator<Item = O
                 .collect::<Vec<_>>()
                 .join("\n");
 
+            // double check if there are instructions to generate
+            // (to prevent empty modules)
+            if instructions.is_empty() {
+                return None;
+            }
+
             Some(OutputFile::new(module_kind.to_string(), instructions))
         })
 }
