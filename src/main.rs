@@ -7,7 +7,13 @@ mod fileio;
 mod parser;
 
 fn main() {
-    let root_path = Path::new("./tmp");
+    // TODO: replace with `clap`
+    let root_path = std::env::args().nth(1).unwrap_or_else(|| String::from("."));
+
+    compile(Path::new(&root_path));
+}
+
+fn compile(root_path: &Path) {
     let source_dir = SourceDir::setup(root_path).unwrap();
     let output_generator = OutputGenerator::setup(root_path).unwrap();
 
