@@ -6,7 +6,7 @@ push constant 0
 eq
 if-goto VARIANT_0_0
 push argument 0
-call Math.inc 1
+call Int.inc 1
 push argument 1
 call List.List_tail 1
 pop argument 1
