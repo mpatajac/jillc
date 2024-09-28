@@ -127,10 +127,11 @@ fn construct_if(
     .concat();
 
     // condition check -> action -> label to skip to if condition not satisfied
+    // 								+ null (so expression evaluates to a value)
     let instructions = [
         condition_instructions,
         argument_construction.construct(action, module_context, program_context)?,
-        vec![vm::label(vm::LabelAction::Label, skip_if_label)],
+        vec![vm::label(vm::LabelAction::Label, skip_if_label), vm::null()],
     ];
 
     // endregion
@@ -536,6 +537,7 @@ mod tests {
             "if-goto SKIP_IF_0",
             "call Other.action 0",
             "label SKIP_IF_0",
+            "push constant 0",
         ]
         .join("\n");
 
