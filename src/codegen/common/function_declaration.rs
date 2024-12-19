@@ -214,7 +214,7 @@ mod tail_recursion {
             }),
 
             // cannot have a nested recursive call
-            Cif::Todo => false,
+            Cif::Todo | Cif::Free => false,
         }
     }
 

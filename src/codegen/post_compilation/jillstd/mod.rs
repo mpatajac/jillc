@@ -359,6 +359,12 @@ enum JillStdList {
 		List.List_tail,
 	"))]
     Any,
+
+    #[strum(props(Arity = "1"))]
+    Dispose,
+
+    #[strum(props(Arity = "2"))]
+    DisposeWith,
 }
 
 impl JillStdList {
@@ -379,6 +385,8 @@ impl JillStdList {
             Self::IsEmpty => include_str!("List/isEmpty.vm"),
             Self::All => include_str!("List/all.vm"),
             Self::Any => include_str!("List/any.vm"),
+            Self::Dispose => include_str!("List/dispose.vm"),
+            Self::DisposeWith => include_str!("List/disposeWith.vm"),
         }
     }
 }

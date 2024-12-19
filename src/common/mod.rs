@@ -10,4 +10,5 @@ pub enum CompilerInternalFunction {
     Do,
     Match,
     Todo,
+    Free,
 }

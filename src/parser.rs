@@ -259,6 +259,7 @@ mod identifier {
             text::keyword("do"),
             text::keyword("match"),
             text::keyword("todo"),
+            text::keyword("free"),
         ])
     }
 

@@ -22,6 +22,7 @@ pub fn construct(program_context: &mut ProgramContext) -> Result<Option<OutputFi
 
     let instruction_block: vm::VMInstructionBlock = [
         construct_new(),
+        construct_dispose(),
         construct_call(functions_to_dispatch, program_context)?,
     ]
     .concat()
@@ -32,6 +33,13 @@ pub fn construct(program_context: &mut ProgramContext) -> Result<Option<OutputFi
         instruction_block.compile(),
     )))
 }
+
+// NOTE: since this module is completely unrelated the rest of the program,
+// we will use TEMP 7 (last one) to prevent any possible overwrites (just in case)
+const FN_TEMP_STORAGE: VariableContext = VariableContext {
+    segment: vm::Segment::Temp,
+    index: 7,
+};
 
 fn construct_new() -> Vec<vm::VMInstruction> {
     vec![
@@ -52,17 +60,27 @@ fn construct_new() -> Vec<vm::VMInstruction> {
     ]
 }
 
+fn construct_dispose() -> Vec<vm::VMInstruction> {
+    vec![
+        vm::function(vm::VMFunctionName::from_literal("Fn.dispose"), 0),
+        // set closure object as `THIS`
+        vm::push(vm::Segment::Argument, 0),
+        vm::pop(vm::Segment::Pointer, 0),
+        // dispose captures array
+        vm::push(vm::Segment::This, 1),
+        vm::call(vm::VMFunctionName::from_literal("Array.dispose"), 1),
+        FN_TEMP_STORAGE.pop(),
+        // deAlloc closure object
+        vm::push(vm::Segment::Argument, 0),
+        vm::call(vm::VMFunctionName::from_literal("Memory.deAlloc"), 1),
+        vm::vm_return(),
+    ]
+}
+
 fn construct_call(
     functions_to_dispatch: Vec<(vm::VMFunctionName, FunctionReferenceIndex)>,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
-    // NOTE: since this function is completely unrelated the rest of the program,
-    // we will use TEMP 7 (last one) to prevent any possible overwrites (just in case)
-    let arg_counter_storage = VariableContext {
-        segment: vm::Segment::Temp,
-        index: 7,
-    };
-
     let vm_function_name = vm::VMFunctionName::from_literal("Fn._call");
 
     let closure_as_this = vec![
@@ -72,18 +90,18 @@ fn construct_call(
 
     let arguments_construction = vec![
         vm::push(vm::Segment::Constant, 0),
-        arg_counter_storage.pop(),
+        FN_TEMP_STORAGE.pop(),
         vm::label(vm::LabelAction::Label, "ARGS_INIT_START"),
         // section: condition check
         // counter
-        arg_counter_storage.push()[0].clone(),
+        FN_TEMP_STORAGE.push()[0].clone(),
         // arity
         vm::push(vm::Segment::Argument, 1),
         vm::command(vm::VMCommand::Eq),
         vm::label(vm::LabelAction::IfGoto, "ARGS_INIT_END"),
         // section: loop body
         // counter
-        arg_counter_storage.push()[0].clone(),
+        FN_TEMP_STORAGE.push()[0].clone(),
         // arguments
         vm::push(vm::Segment::Argument, 2),
         vm::command(vm::VMCommand::Add),
@@ -91,10 +109,10 @@ fn construct_call(
         vm::pop(vm::Segment::Pointer, 1),
         vm::push(vm::Segment::That, 0),
         // increase counter
-        arg_counter_storage.push()[0].clone(),
+        FN_TEMP_STORAGE.push()[0].clone(),
         vm::push(vm::Segment::Constant, 1),
         vm::command(vm::VMCommand::Add),
-        arg_counter_storage.pop(),
+        FN_TEMP_STORAGE.pop(),
         // repeat loop
         vm::label(vm::LabelAction::Goto, "ARGS_INIT_START"),
         vm::label(vm::LabelAction::Label, "ARGS_INIT_END"),
