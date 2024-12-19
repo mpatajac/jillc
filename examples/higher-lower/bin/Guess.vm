@@ -1,0 +1,144 @@
+function Guess.GuessResult_tag 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function Guess.Correct 0
+push constant 1
+call Memory.alloc 1
+pop pointer 0
+push constant 0
+pop this 0
+push pointer 0
+return
+function Guess.Higher 0
+push constant 1
+call Memory.alloc 1
+pop pointer 0
+push constant 1
+pop this 0
+push pointer 0
+return
+function Guess.Lower 0
+push constant 1
+call Memory.alloc 1
+pop pointer 0
+push constant 2
+pop this 0
+push pointer 0
+return
+function Guess.determineGuessResult 0
+push argument 0
+push argument 1
+eq
+push constant 0
+eq
+if-goto SKIP_TRUE_0
+call Guess.Correct 0
+goto SKIP_FALSE_0
+label SKIP_TRUE_0
+push argument 0
+push argument 1
+lt
+push constant 0
+eq
+if-goto SKIP_TRUE_1
+call Guess.Lower 0
+goto SKIP_FALSE_1
+label SKIP_TRUE_1
+call Guess.Higher 0
+label SKIP_FALSE_1
+label SKIP_FALSE_0
+return
+function Guess.guessResultDisplay 0
+push argument 0
+call Guess.GuessResult_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+push temp 0
+push constant 1
+eq
+if-goto VARIANT_1_0
+label VARIANT_2_0
+push constant 6
+call String.new 1
+push constant 76
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 119
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+goto MATCH_END_0
+label VARIANT_1_0
+push constant 7
+call String.new 1
+push constant 72
+call String.appendChar 2
+push constant 105
+call String.appendChar 2
+push constant 103
+call String.appendChar 2
+push constant 104
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 8
+call String.new 1
+push constant 67
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 99
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 33
+call String.appendChar 2
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Guess.isCorrectGuess 0
+push argument 0
+call Guess.GuessResult_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+push temp 0
+push constant 1
+eq
+if-goto VARIANT_1_0
+label VARIANT_2_0
+push constant 0
+goto MATCH_END_0
+label VARIANT_1_0
+push constant 0
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 1
+neg
+goto MATCH_END_0
+label MATCH_END_0
+return

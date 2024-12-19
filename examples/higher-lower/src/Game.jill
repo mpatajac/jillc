@@ -1,0 +1,29 @@
+
+-- @type () -> Int
+fn enterGuess = Keyboard::readInt("Enter number: ").
+
+fn playTurn selectedNumber totalAttempts =
+	let guess = do(
+		-- start with a slight delay (to prevent accidental duplicate input)
+		Sys::wait(100),
+		enterGuess()
+	),
+
+	let guessResult = Guess::determineGuessResult(selectedNumber, guess),
+
+	do(
+		-- output guess status
+		Output::printString(Guess::guessResultDisplay(guessResult)),
+		Output::println(),
+		-- spacer line
+		Output::println(),
+		ifElse(
+			-- if the guess is correct
+			Guess::isCorrectGuess(guessResult),
+			-- stop and return how many attempts it took
+			totalAttempts,
+			-- otherwise increment attempt count and repeat
+			-- NOTE: tail-recursive, so only uses one stack frame
+			playTurn(selectedNumber, Int::inc(totalAttempts))
+		)
+	).

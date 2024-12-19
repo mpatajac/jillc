@@ -1,0 +1,62 @@
+
+let enterKeyCode = 128.
+
+-- Print a string and follow it with a newline.
+-- @type String -> ()
+fn printStringLn text =
+	do(
+		Output::printString(text),
+		Output::println()
+	).
+
+
+-- Wait for user to input the "enter" keycode - 
+-- used to generate a "seed" for further random generation.
+-- @type () -> Int
+fn pickRandomSeed = 
+	fn isEnterPressed input = Bool::eq(input, enterKeyCode).
+
+	fn getPlayerInput seed =
+		let userInput = Keyboard::keyPressed(),
+		
+		ifElse(
+			-- if enter is pressed
+			isEnterPressed(userInput),
+			-- return current (random) seed
+			seed,
+			-- otherwise restart check with an updated seed
+			getPlayerInput(Int::inc(seed))
+		).
+
+	-- start "seed loop" with a seed value of 0
+	getPlayerInput(0).
+
+
+
+fn main = 
+	-- `do` block allows us to perform a series of actions
+	-- it also returns the result of the last action
+	let randomSeed = do(
+		printStringLn("HIGHER - LOWER"),
+		printStringLn("Try to guess a number (1-100) with fewest attempts!"),
+		printStringLn("Press 'Enter' to start the game"),
+		pickRandomSeed()
+	),
+
+	-- create a random generator (provided in the JillStd)
+	let random = Random::Random(randomSeed),
+
+	-- pick a random number (for player to guess)
+	-- NOTE: `fromRange` uses range [a, b>
+	let selectedNumber = Random::fromRange(random, 1, 101),
+
+	-- start a first guessing turn
+	let totalAttempts = Game::playTurn(selectedNumber, 1),
+
+	do(
+		Output::println(),
+		Output::printString("It took you "),
+		Output::printInt(totalAttempts),
+		Output::printString(" attempts to guess the number!"),
+		Output::println()
+	).
