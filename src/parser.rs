@@ -76,13 +76,8 @@ fn literal(
     expression: impl Parser<char, JillExpression, Error = JillParseError>,
 ) -> impl Parser<char, JillLiteral, Error = JillParseError> {
     // integer
-    let number =
-        text::int(10).map(|s: String| s.parse::<isize>().expect("should be a valid number"));
-
-    let negation_sign = just('-').or_not();
-    let integer = negation_sign
-        .then(number)
-        .map(|(sign, number)| if sign.is_some() { -number } else { number })
+    let integer = text::int(10)
+        .map(|s: String| s.parse::<usize>().expect("should be a valid number"))
         .map(JillLiteral::Integer);
 
     // string

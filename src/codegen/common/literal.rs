@@ -22,14 +22,8 @@ pub fn construct(
     Ok(instructions)
 }
 
-fn construct_integer(i: &isize) -> Vec<vm::VMInstruction> {
-    let mut instructions = vec![vm::push(vm::Segment::Constant, i.unsigned_abs())];
-
-    if *i < 0 {
-        instructions.push(vm::command(vm::VMCommand::Neg));
-    }
-
-    instructions
+fn construct_integer(i: &usize) -> Vec<vm::VMInstruction> {
+    vec![vm::push(vm::Segment::Constant, *i)]
 }
 
 fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
@@ -137,18 +131,6 @@ mod tests {
         let i = 17;
 
         let expected = "push constant 17";
-
-        assert_eq!(
-            vm::VMInstructionBlock::from(super::construct_integer(&i)).compile(),
-            expected
-        );
-    }
-
-    #[test]
-    fn test_negative_integer_construction() {
-        let i = -28;
-
-        let expected = ["push constant 28", "neg"].join("\n");
 
         assert_eq!(
             vm::VMInstructionBlock::from(super::construct_integer(&i)).compile(),

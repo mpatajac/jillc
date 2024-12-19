@@ -455,20 +455,14 @@ mod tests {
         };
         let arguments = vec![
             ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
-            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
         ];
         let function_call = ast::JillFunctionCall {
             reference: function_reference,
             arguments,
         };
 
-        let expected = [
-            "push constant 5",
-            "push constant 7",
-            "neg",
-            "call Foo.bar 2",
-        ]
-        .join("\n");
+        let expected = ["push constant 5", "push constant 7", "call Foo.bar 2"].join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
@@ -502,20 +496,14 @@ mod tests {
         };
         let arguments = vec![
             ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
-            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
         ];
         let function_call = ast::JillFunctionCall {
             reference: function_reference,
             arguments,
         };
 
-        let expected = [
-            "push constant 5",
-            "push constant 7",
-            "neg",
-            "call Test.foo 2",
-        ]
-        .join("\n");
+        let expected = ["push constant 5", "push constant 7", "call Test.foo 2"].join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
@@ -540,20 +528,14 @@ mod tests {
         };
         let arguments = vec![
             ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
-            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
         ];
         let function_call = ast::JillFunctionCall {
             reference: function_reference,
             arguments,
         };
 
-        let expected = [
-            "push constant 5",
-            "push constant 7",
-            "neg",
-            "call Test.bar_baz 2",
-        ]
-        .join("\n");
+        let expected = ["push constant 5", "push constant 7", "call Test.bar_baz 2"].join("\n");
 
         assert!(
             construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
@@ -654,7 +636,7 @@ mod tests {
         };
         let arguments = vec![
             ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
-            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
         ];
         let function_call = ast::JillFunctionCall {
             reference: function_reference,
@@ -675,12 +657,11 @@ mod tests {
             "pop pointer 1",
             "push temp 0",
             "pop that 0",
-            // add `-7`
+            // add `7`
             "push constant 1",
             "push temp 1",
             "add",
             "push constant 7",
-            "neg",
             "pop temp 0",
             "pop pointer 1",
             "push temp 0",
