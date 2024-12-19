@@ -1,0 +1,23 @@
+-- @type Int, Int -> Int
+fn sumNumbers total count =
+	-- @type () -> Int
+	fn readNum = Keyboard::readInt("Enter a number: ").
+
+	ifElse(
+		Bool::le(count, 0),
+		total,
+		sumNumbers(
+			Int::add(readNum(), total),
+			Int::dec(count)
+		)
+	).
+
+fn main = 
+	let length = Keyboard::readInt("How many numbers? "),
+	let total = sumNumbers(0, length),
+	let average = Int::div(total, length),
+
+	do(
+		Output::printString("The average is "),
+		Output::printInt(average),
+	).
