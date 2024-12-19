@@ -17,6 +17,7 @@ static OVERRIDES: phf::Map<&'static str, FunctionOverrideKind> = phf_map! {
     // VM
     "Int.add" => FunctionOverrideKind::VM(vm::VMCommand::Add),
     "Int.sub" => FunctionOverrideKind::VM(vm::VMCommand::Sub),
+    "Int.neg" => FunctionOverrideKind::VM(vm::VMCommand::Neg),
     "Bool.eq" => FunctionOverrideKind::VM(vm::VMCommand::Eq),
     "Bool.gt" => FunctionOverrideKind::VM(vm::VMCommand::Gt),
     "Bool.lt" => FunctionOverrideKind::VM(vm::VMCommand::Lt),

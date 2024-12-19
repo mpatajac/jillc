@@ -680,4 +680,29 @@ mod tests {
             )
         );
     }
+
+    #[test]
+    fn test_negative_integer_construction() {
+        let mut program_context = ProgramContext::new();
+        let mut module_context = ModuleContext::new(String::from("Test"));
+
+        let function_reference = ast::JillFunctionReference {
+            modules_path: vec![ast::JillIdentifier(String::from("Int"))],
+            associated_type: None,
+            function_name: ast::JillIdentifier(String::from("neg")),
+        };
+        let arguments = vec![ast::JillExpression::Literal(ast::JillLiteral::Integer(28))];
+        let function_call = ast::JillFunctionCall {
+            reference: function_reference,
+            arguments,
+        };
+
+        let expected = ["push constant 28", "neg"].join("\n");
+
+        assert!(
+            construct(&function_call, &mut module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected
+            )
+        );
+    }
 }

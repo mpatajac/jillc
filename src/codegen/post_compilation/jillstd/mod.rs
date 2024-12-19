@@ -139,6 +139,9 @@ enum JillStdInt {
     /// `%`
     #[strum(props(Arity = "2"))]
     Mod,
+    /// `-`
+    #[strum(props(Arity = "1"))]
+    Neg,
     /// `++`
     #[strum(props(Arity = "1"))]
     Inc,
@@ -162,6 +165,7 @@ impl JillStdInt {
             Self::Mult => include_str!("Int/mult.vm"),
             Self::Div => include_str!("Int/div.vm"),
             Self::Mod => include_str!("Int/mod.vm"),
+            Self::Neg => include_str!("Int/neg.vm"),
             Self::Inc => include_str!("Int/inc.vm"),
             Self::Dec => include_str!("Int/dec.vm"),
             Self::Min => include_str!("Int/min.vm"),
