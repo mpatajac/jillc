@@ -1,0 +1,4 @@
+function Int.neg 0
+push argument 0
+neg
+return

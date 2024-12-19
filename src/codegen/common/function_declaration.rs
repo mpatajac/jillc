@@ -391,7 +391,7 @@ mod tests {
                     },
                     arguments: vec![
                         ast::JillExpression::VariableName(ast::JillIdentifier(String::from("o"))),
-                        ast::JillExpression::Literal(ast::JillLiteral::Integer(-1)),
+                        ast::JillExpression::Literal(ast::JillLiteral::Integer(0)),
                         ast::JillExpression::FunctionCall(ast::JillFunctionCall {
                             reference: ast::JillFunctionReference {
                                 modules_path: vec![],
@@ -499,7 +499,7 @@ mod tests {
                let c = Int::mult(a, b),
                let d = Int::sub(c, 6),
 
-               ifElse(bar(d), 1, -1).
+               ifElse(bar(d), 1, 0).
         */
         let function = JillFunction {
             name: JillIdentifier("foo".to_owned()),
@@ -577,7 +577,7 @@ mod tests {
                             ))],
                         }),
                         JillExpression::Literal(JillLiteral::Integer(1)),
-                        JillExpression::Literal(JillLiteral::Integer(-1)),
+                        JillExpression::Literal(JillLiteral::Integer(0)),
                     ],
                 }),
             },
@@ -602,7 +602,7 @@ mod tests {
             "push constant 6",
             "sub",
             "pop local 1",
-            // ifElse(bar(d), 1, -1)
+            // ifElse(bar(d), 1, 0)
             "push local 1",
             "call Test.foo_bar 1",
             "push constant 0",
@@ -611,8 +611,7 @@ mod tests {
             "push constant 1",
             "goto SKIP_FALSE_0",
             "label SKIP_TRUE_0",
-            "push constant 1",
-            "neg",
+            "push constant 0",
             "label SKIP_FALSE_0",
             "return",
         ]

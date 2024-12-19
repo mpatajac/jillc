@@ -621,7 +621,7 @@ mod tests {
         let mut program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new(String::from("Test"));
 
-        // `ifElse(b, 5, -7)`
+        // `ifElse(b, 5, 7)`
 
         assert!(module_context
             .scope
@@ -639,7 +639,7 @@ mod tests {
         let arguments = vec![
             ast::JillExpression::VariableName(ast::JillIdentifier(String::from("b"))),
             ast::JillExpression::Literal(ast::JillLiteral::Integer(5)),
-            ast::JillExpression::Literal(ast::JillLiteral::Integer(-7)),
+            ast::JillExpression::Literal(ast::JillLiteral::Integer(7)),
         ];
         let function_call = ast::JillFunctionCall {
             reference: function_reference,
@@ -658,7 +658,6 @@ mod tests {
             // false
             "label SKIP_TRUE_0",
             "push constant 7",
-            "neg",
             "label SKIP_FALSE_0",
         ]
         .join("\n");

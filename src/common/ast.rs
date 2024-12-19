@@ -88,7 +88,7 @@ pub struct JillFunctionCall {
 
 #[derive(Debug)]
 pub enum JillLiteral {
-    Integer(isize),
+    Integer(usize),
     String(String),
     Bool(bool),
     List(Vec<JillExpression>),
