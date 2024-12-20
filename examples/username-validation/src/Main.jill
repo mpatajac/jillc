@@ -1,0 +1,79 @@
+-- VALIDATOR
+
+-- @type UsernameValidator(List(Fn(String) -> Bool))
+type UsernameValidator = UsernameValidator(validations).
+
+
+-- @type UsernameValidator, String -> Bool
+fn isValidUsername validator username =
+	-- `List::map` expects a one-argument function (only validation from list),
+	-- so we have to capture username from parent
+	fn applyValidation validation [username] = validation(username).
+
+	-- apply all validations to the given username
+	let validationResults = List::map(UsernameValidator:validations(validator), &applyValidation),
+
+	-- check if all results are "valid" (`True`)
+	List::all(validationResults, &StdUtils::identity).
+
+
+-- VALIDATIONS
+
+-- @type Int -> Fn(String -> Bool)
+fn isMinLength minLength =
+	-- NOTE: validator expects one-argument functions (only takes in username),
+	-- so we have to capture minimum length data and "embed" it in the closure
+	-- @type String, [Int] -> Bool
+	fn checkIsMinLength username [minLength] = 
+		Bool::ge(
+			String::length(username),
+			minLength
+		).
+
+	&checkIsMinLength.
+
+-- @type Int -> Fn(String -> Bool)
+fn isMaxLength maxLength =
+	-- NOTE: validator expects one-argument functions (only takes in username),
+	-- so we have to capture maximum length data and "embed" it in the closure
+	-- @type String, [Int] -> Bool
+	fn checkIsMaxLength username [maxLength] = 
+		Bool::le(
+			String::length(username),
+			maxLength
+		).
+
+	&checkIsMaxLength.
+
+
+-- MAIN
+
+fn main =
+	-- @type () -> UsernameValidator
+	fn buildUsernameValidator = 
+		-- @type Fn(String) -> Bool
+		let minLengthValidator = isMinLength(3),
+
+		-- @type Fn(String) -> Bool
+		let maxLengthValidator = isMaxLength(10),
+
+		UsernameValidator([
+			-- NOTE: no need to "take a reference" because
+			-- these are already closures (returned from functions)
+			minLengthValidator,
+			maxLengthValidator,
+		]).
+
+	let usernameValidator = buildUsernameValidator(),
+
+	let username = Keyboard::readLine("Enter username: "),
+
+	let usernameIsValid = isValidUsername(usernameValidator, username),
+	let validationResponseMessage = 
+		ifElse(
+			usernameIsValid,
+			"Username is valid!",
+			"Username is NOT valid!",
+		),
+	
+	Output::printString(validationResponseMessage).

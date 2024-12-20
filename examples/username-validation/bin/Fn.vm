@@ -1,0 +1,76 @@
+function Fn._new 0
+push constant 2
+call Memory.alloc 1
+pop pointer 0
+push argument 0
+pop this 0
+push argument 1
+pop this 1
+push pointer 0
+return
+function Fn.dispose 0
+push argument 0
+pop pointer 0
+push this 1
+call Array.dispose 1
+pop temp 7
+push argument 0
+call Memory.deAlloc 1
+return
+function Fn._call 0
+push argument 0
+pop pointer 0
+push constant 0
+pop temp 7
+label ARGS_INIT_START
+push temp 7
+push argument 1
+eq
+if-goto ARGS_INIT_END
+push temp 7
+push argument 2
+add
+pop pointer 1
+push that 0
+push temp 7
+push constant 1
+add
+pop temp 7
+goto ARGS_INIT_START
+label ARGS_INIT_END
+push this 1
+push constant 0
+eq
+if-goto SKIP_CAPTURES
+push this 1
+label SKIP_CAPTURES
+push this 0
+push constant 1
+eq
+if-goto FN_0
+push this 0
+push constant 3
+eq
+if-goto FN_1
+push this 0
+push constant 0
+eq
+if-goto FN_2
+push this 0
+push constant 2
+eq
+if-goto FN_3
+push constant 0
+return
+label FN_0
+call StdUtils.identity 1
+return
+label FN_1
+call Main.isMaxLength_checkIsMaxLength 2
+return
+label FN_2
+call Main.isValidUsername_applyValidation 2
+return
+label FN_3
+call Main.isMinLength_checkIsMinLength 2
+return

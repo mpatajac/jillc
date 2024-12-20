@@ -1,0 +1,12 @@
+function Bool.le 0
+push argument 0
+push argument 1
+gt
+not
+return
+function Bool.ge 0
+push argument 0
+push argument 1
+lt
+not
+return
