@@ -1,0 +1,39 @@
+type GuessResult =
+	Correct,
+	Higher,
+	Lower.
+
+-- @type Int, Int -> GuessResult
+fn determineGuessResult selectedNumber guess =
+	ifElse(
+		Bool::eq(selectedNumber, guess),
+		Correct(),
+		ifElse(
+			Bool::lt(selectedNumber, guess),
+			Lower(),
+			Higher(),
+		)
+	).
+
+-- @type GuessResult -> String
+fn guessResultDisplay guessResult =
+	-- `match` enables us to perform action
+	-- based on the value's type variant
+	GuessResult:match(
+		-- value whoose type variant we are checking
+		guessResult,
+		-- action if first variant
+		"Correct!",
+		-- action if second variant
+		"Higher!",
+		-- action if third variant
+		"Lower!",
+	).
+
+fn isCorrectGuess guessResult =
+	GuessResult:match(
+		guessResult,
+		True,
+		False,
+		False,
+	).

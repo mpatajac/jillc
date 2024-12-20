@@ -1,0 +1,5 @@
+function Globals.init 0
+call Main._init__globals 0
+pop temp 0
+push constant 0
+return

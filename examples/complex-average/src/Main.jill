@@ -1,0 +1,84 @@
+-- Generic average calculation (allows for normal average, weighted average etc.)
+-- @type List(Int), Fn(List(Int) -> Int), Fn(List(Int) -> Int) -> Int
+fn _baseAverage numbers determineTotal determineCount =
+	Int::div(
+		determineTotal(numbers), 
+		determineCount(numbers)
+	).
+
+-- Helper function for calculating the sum of a list.
+-- @type List(Int) -> Int
+fn listSum numbers =
+	List::fold(numbers, 0, &Int::add).
+
+-- Classic average
+-- @type List(Int) -> Int
+fn average numbers =
+	_baseAverage(numbers, &listSum, &List::length).
+
+-- Average without the smallest and largest element
+-- @type List(Int) -> Int
+fn centeredAverage numbers =
+	fn count numbers = Int::sub(List::length(numbers), 2).
+
+	fn total numbers =
+		fn _listOptimum list optimumCmp =
+			List::fold(list, List::List:head(list), optimumCmp).
+
+		let sum = listSum(numbers),
+		let listMax = _listOptimum(numbers, &Int::max),
+		let listMin = _listOptimum(numbers, &Int::min),
+
+		Int::sub(sum, Int::add(listMax, listMin)).
+
+
+	_baseAverage(numbers, &total, &count).
+
+
+fn main = 
+	-- @type () -> Int
+	fn promptNum = Keyboard::readInt("Enter a number: ").
+
+	-- @type List(Int), Int -> List(Int)
+	fn readNumbers numbers count =
+		ifElse(
+			Bool::le(count, 0),
+			List::reverse(numbers),
+			readNumbers(
+				List::List(promptNum(), numbers),
+				Int::dec(count)
+			)
+		).
+
+	-- @type List(Int) -> ()
+	fn printNumbers numbers =
+		if(
+			Bool::not(List::isEmpty(numbers)),
+			do(
+				Output::printInt(List::List:head(numbers)),
+				Output::printString(", "),
+				printNumbers(
+					List::List:tail(numbers)
+				)
+			)
+		).
+
+
+	let length = Keyboard::readInt("How many numbers? "),
+	let numbers = readNumbers(List::Empty(), length),
+
+	do(
+		Output::println(),
+
+		Output::printString("Numbers: "),
+		printNumbers(numbers),
+		Output::println(),
+
+		Output::printString("Average: "),
+		Output::printInt(average(numbers)),
+		Output::println(),
+
+		Output::printString("Centered average: "),
+		Output::printInt(centeredAverage(numbers)),
+		Output::println()
+	).

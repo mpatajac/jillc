@@ -1,0 +1,25 @@
+function Int.inc 0
+push argument 0
+push constant 1
+add
+return
+function Int.max 0
+push argument 0
+push argument 1
+call Math.max 2
+return
+function Int.add 0
+push argument 0
+push argument 1
+add
+return
+function Int.dec 0
+push argument 0
+push constant 1
+sub
+return
+function Int.min 0
+push argument 0
+push argument 1
+call Math.min 2
+return
