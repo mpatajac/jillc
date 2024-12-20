@@ -9,7 +9,7 @@ pub struct ArrayBuildConfiguration {
 pub fn build_array_instructions<T, F>(
     array_items: &[T],
     mut item_instructions: F,
-    build_configuration: ArrayBuildConfiguration,
+    build_configuration: &ArrayBuildConfiguration,
 ) -> FallableInstructions
 where
     F: FnMut(&T) -> FallableInstructions,

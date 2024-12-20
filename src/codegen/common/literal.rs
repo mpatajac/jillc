@@ -13,17 +13,17 @@ pub fn construct(
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
     let instructions = match literal {
-        ast::JillLiteral::Integer(i) => construct_integer(i),
+        ast::JillLiteral::Integer(i) => construct_integer(*i),
         ast::JillLiteral::String(s) => construct_string(s),
-        ast::JillLiteral::Bool(b) => construct_bool(b),
+        ast::JillLiteral::Bool(b) => construct_bool(*b),
         ast::JillLiteral::List(l) => construct_list(l, module_context, program_context)?,
     };
 
     Ok(instructions)
 }
 
-fn construct_integer(i: &usize) -> Vec<vm::VMInstruction> {
-    vec![vm::push(vm::Segment::Constant, *i)]
+fn construct_integer(i: usize) -> Vec<vm::VMInstruction> {
+    vec![vm::push(vm::Segment::Constant, i)]
 }
 
 fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
@@ -45,8 +45,8 @@ fn construct_string(s: &str) -> Vec<vm::VMInstruction> {
     [string_init, string_population].concat()
 }
 
-fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
-    if *b {
+fn construct_bool(b: bool) -> Vec<vm::VMInstruction> {
+    if b {
         vm::r#true()
     } else {
         vec![vm::r#false()]
@@ -54,7 +54,7 @@ fn construct_bool(b: &bool) -> Vec<vm::VMInstruction> {
 }
 
 fn construct_list(
-    list: &Vec<ast::JillExpression>,
+    list: &[ast::JillExpression],
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -133,7 +133,7 @@ mod tests {
         let expected = "push constant 17";
 
         assert_eq!(
-            vm::VMInstructionBlock::from(super::construct_integer(&i)).compile(),
+            vm::VMInstructionBlock::from(super::construct_integer(i)).compile(),
             expected
         );
     }

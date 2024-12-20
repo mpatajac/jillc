@@ -4,6 +4,7 @@ use super::vm;
 
 /// List of all errors that could possibly occur during code generation.
 #[derive(Debug)]
+#[allow(dead_code, reason = "still to be used")]
 pub enum Error {
     VariableAlreadyInScope(String),
     FunctionAlreadyInScope(String),

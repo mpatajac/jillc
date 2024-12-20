@@ -74,7 +74,7 @@ pub(super) fn construct_with_custom_argument_construction(
         ),
         CompilerInternalFunction::Match => construct_match(
             function_call,
-            argument_construction,
+            &argument_construction,
             module_context,
             program_context,
         ),
@@ -282,7 +282,7 @@ fn construct_do(
 
 fn construct_match(
     function_call: &ast::JillFunctionCall,
-    argument_construction: impl ArgumentConstruction,
+    argument_construction: &impl ArgumentConstruction,
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -406,8 +406,8 @@ fn construct_match(
 
 fn construct_todo(
     function_call: &ast::JillFunctionCall,
-    module_context: &mut ModuleContext,
-    program_context: &mut ProgramContext,
+    _module_context: &ModuleContext,
+    _program_context: &ProgramContext,
 ) -> FallableInstructions {
     let function_reference = &function_call.reference;
 
@@ -510,7 +510,7 @@ fn is_module_preceded(function_reference: &ast::JillFunctionReference) -> bool {
     function_reference.is_fully_qualified()
 }
 
-fn is_type_preceded(function_reference: &ast::JillFunctionReference) -> bool {
+const fn is_type_preceded(function_reference: &ast::JillFunctionReference) -> bool {
     function_reference.associated_type.is_some()
 }
 
@@ -518,22 +518,22 @@ fn is_preceded(function_reference: &ast::JillFunctionReference) -> bool {
     is_module_preceded(function_reference) || is_type_preceded(function_reference)
 }
 
-fn is_function_call(expr: &ast::JillExpression) -> bool {
+const fn is_function_call(expr: &ast::JillExpression) -> bool {
     matches!(expr, ast::JillExpression::FunctionCall(_))
 }
 
-fn is_variable(expr: &ast::JillExpression) -> bool {
+const fn is_variable(expr: &ast::JillExpression) -> bool {
     matches!(expr, ast::JillExpression::VariableName(_))
 }
 
-fn is_string(expr: &ast::JillExpression) -> bool {
+const fn is_string(expr: &ast::JillExpression) -> bool {
     matches!(
         expr,
         ast::JillExpression::Literal(ast::JillLiteral::String(_))
     )
 }
 
-fn can_be_object(expr: &ast::JillExpression) -> bool {
+const fn can_be_object(expr: &ast::JillExpression) -> bool {
     // object (instance of custom type) can only be present
     // as a variable or a result of a function call
     matches!(

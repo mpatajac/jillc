@@ -27,7 +27,7 @@ pub fn construct_module(
     types::construct(module.content.types, &mut module_context, program_context)?;
 
     globals::construct(
-        module.content.variables,
+        &module.content.variables,
         &mut module_context,
         program_context,
     )?;

@@ -36,7 +36,7 @@ pub fn construct(
         }
         FunctionCallKind::Variable(variable_context) => variable_call::construct(
             function_call,
-            variable_context,
+            &variable_context,
             module_context,
             program_context,
         ),
@@ -143,7 +143,7 @@ mod variable_call {
 
     pub(super) fn construct(
         function_call: &ast::JillFunctionCall,
-        variable_context: VariableContext,
+        variable_context: &VariableContext,
         module_context: &mut ModuleContext,
         program_context: &mut ProgramContext,
     ) -> FallableInstructions {
@@ -158,13 +158,12 @@ mod variable_call {
         let arguments_array_instructions = helpers::array::build_array_instructions(
             &function_call.arguments,
             |expr| expression::construct(expr, module_context, program_context),
-            array_instructions_build_config,
+            &array_instructions_build_config,
         )?;
 
         let function_arity = function_call.arguments.len();
 
-        let call_instructions = vec![
-            // closure
+        let call_instructions = [
             variable_context.push(),
             vec![
                 // arity
@@ -228,7 +227,7 @@ pub(super) mod direct_call {
             has_captures: bool,
         ) -> Vec<vm::VMInstruction> {
             // increase argument count by one if there are captures (for capture array)
-            let argument_count = function_call.arguments.len() + (has_captures as usize);
+            let argument_count = function_call.arguments.len() + usize::from(has_captures);
 
             vec![vm::call(
                 function_call.reference.to_fully_qualified_hack_name(

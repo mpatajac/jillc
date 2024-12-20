@@ -36,8 +36,7 @@ static OVERRIDES: phf::Map<&'static str, FunctionOverrideKind> = phf_map! {
 pub fn find_override(
     function_reference: &ast::JillFunctionReference,
 ) -> Option<FunctionOverrideKind> {
-    let vm_function_name =
-        function_reference.to_fully_qualified_hack_name(&String::new(), String::new());
+    let vm_function_name = function_reference.to_fully_qualified_hack_name("", String::new());
 
     OVERRIDES.get(&vm_function_name).cloned()
 }

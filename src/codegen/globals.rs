@@ -7,13 +7,13 @@ use crate::{
 };
 
 use super::{
-    common::helpers::{self, variable::JillVariableExtensions},
+    common::helpers::{self},
     error::{Error, FallableAction, FallableInstructions},
     GLOBALS_INIT_FN_NAME,
 };
 
 pub fn construct(
-    globals: Vec<ast::JillVariable>,
+    globals: &[ast::JillVariable],
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableAction {
@@ -26,7 +26,7 @@ pub fn construct(
     }
 
     let globals_assignment_instructions =
-        construct_globals(&globals, module_context, program_context)?;
+        construct_globals(globals, module_context, program_context)?;
 
     if !globals_assignment_instructions.is_empty() {
         // log this module as one of those which will be called in `Globals.init`
@@ -52,7 +52,7 @@ pub fn construct(
 }
 
 fn construct_globals(
-    globals: &Vec<ast::JillVariable>,
+    globals: &[ast::JillVariable],
     module_context: &mut ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
@@ -113,7 +113,7 @@ mod tests {
             .is_none());
 
         // construction successful and correct
-        assert!(construct(variables, &mut module_context, &mut program_context).is_ok());
+        assert!(construct(&variables, &mut module_context, &mut program_context).is_ok());
         assert_eq!(module_context.output.compile(), expected);
 
         // `foo` now added to scope
@@ -136,7 +136,7 @@ mod tests {
         let variables = vec![];
 
         // result should be empty
-        assert!(construct(variables, &mut module_context, &mut program_context).is_ok());
+        assert!(construct(&variables, &mut module_context, &mut program_context).is_ok());
         assert_eq!(module_context.output.compile(), "");
 
         // module should not be added to "globals to generate" list
@@ -161,7 +161,7 @@ mod tests {
         ];
 
         assert!(
-            construct(variables, &mut module_context, &mut program_context)
+            construct(&variables, &mut module_context, &mut program_context)
                 .is_err_and(|err| matches!(err, Error::DiscardInGlobal))
         );
     }

@@ -114,22 +114,22 @@ impl std::ops::Deref for VMFunctionName {
 // region: VMInstruction utility functions
 
 /// Utility function for the `push` VM instruction.
-pub fn push(segment: Segment, i: usize) -> VMInstruction {
+pub const fn push(segment: Segment, i: usize) -> VMInstruction {
     VMInstruction::Push(segment, i)
 }
 
 /// Utility function for the `pop` VM instruction.
-pub fn pop(segment: Segment, i: usize) -> VMInstruction {
+pub const fn pop(segment: Segment, i: usize) -> VMInstruction {
     VMInstruction::Pop(segment, i)
 }
 
 /// Utility function for the `command` VM instruction.
-pub fn command(command: VMCommand) -> VMInstruction {
+pub const fn command(command: VMCommand) -> VMInstruction {
     VMInstruction::Command(command)
 }
 
 /// Utility function for the `return` VM instruction.
-pub fn vm_return() -> VMInstruction {
+pub const fn vm_return() -> VMInstruction {
     VMInstruction::Command(VMCommand::Return)
 }
 
@@ -139,17 +139,17 @@ pub fn label<S: Into<String>>(label_action: LabelAction, label: S) -> VMInstruct
 }
 
 /// Utility function for the `function` VM instruction.
-pub fn function(function_name: VMFunctionName, variable_count: usize) -> VMInstruction {
+pub const fn function(function_name: VMFunctionName, variable_count: usize) -> VMInstruction {
     VMInstruction::Function(function_name, variable_count)
 }
 
 /// Utility function for the `call` VM instruction.
-pub fn call(function_name: VMFunctionName, argument_count: usize) -> VMInstruction {
+pub const fn call(function_name: VMFunctionName, argument_count: usize) -> VMInstruction {
     VMInstruction::Call(function_name, argument_count)
 }
 
 /// Utility function for pushing the `null` value onto the stack.
-pub fn null() -> VMInstruction {
+pub const fn null() -> VMInstruction {
     VMInstruction::Push(Segment::Constant, 0)
 }
 
@@ -162,7 +162,7 @@ pub fn r#true() -> Vec<VMInstruction> {
 }
 
 /// Utility function for pushing the `false` value onto the stack.
-pub fn r#false() -> VMInstruction {
+pub const fn r#false() -> VMInstruction {
     VMInstruction::Push(Segment::Constant, 0)
 }
 

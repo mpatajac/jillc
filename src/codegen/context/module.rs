@@ -108,6 +108,7 @@ impl Scope {
     /// Add a new variable to the (latest frame of the) scope.
     ///
     /// This is usually performed during a variable definition.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn add_variable(
         &mut self,
         name: Name,
@@ -439,15 +440,18 @@ mod tests {
         assert!(matches!(
             scope.search_function(&"f".to_string()),
             Some(super::FunctionContext {
-                arity,
-                prefix,
-                captures
+                arity: _,
+                prefix: _,
+                captures: _
             })
         ));
 
         assert!(matches!(
             scope.search_variable(&"bar".to_string()),
-            Some(super::VariableContext { segment, index })
+            Some(super::VariableContext {
+                segment: _,
+                index: _
+            })
         ));
 
         assert!(scope.search_function(&"jill".to_string()).is_none());

@@ -8,8 +8,8 @@ use crate::{
 
 pub fn construct(
     variable: &ast::JillIdentifier,
-    module_context: &mut ModuleContext,
-    program_context: &mut ProgramContext,
+    module_context: &ModuleContext,
+    _program_context: &ProgramContext,
 ) -> FallableInstructions {
     let variable_name = &variable.0;
 
@@ -33,7 +33,7 @@ mod tests {
 
     #[test]
     fn test_successful_variable_name_construction() {
-        let mut program_context = ProgramContext::new();
+        let program_context = ProgramContext::new();
         let mut module_context = ModuleContext::new("Test".to_owned());
 
         assert!(module_context
@@ -53,8 +53,8 @@ mod tests {
 
         assert!(construct(
             &ast::JillIdentifier("a".to_string()),
-            &mut module_context,
-            &mut program_context
+            &module_context,
+            &program_context
         )
         .is_ok_and(
             |instructions| vm::VMInstructionBlock::from(instructions).compile()
@@ -64,13 +64,13 @@ mod tests {
 
     #[test]
     fn test_unsuccessful_variable_name_construction() {
-        let mut program_context = ProgramContext::new();
-        let mut module_context = ModuleContext::new("Test".to_owned());
+        let program_context = ProgramContext::new();
+        let module_context = ModuleContext::new("Test".to_owned());
 
         assert!(construct(
             &ast::JillIdentifier("a".to_string()),
-            &mut module_context,
-            &mut program_context
+            &module_context,
+            &program_context
         )
         .is_err_and(|err| matches!(err, Error::VariableNotInScope(_))));
     }

@@ -5,7 +5,7 @@ pub trait JillFunctionReferenceExtensions {
     fn reconstruct_source_name(&self) -> String;
     fn to_fully_qualified_hack_name(
         &self,
-        module_name: &String,
+        module_name: &str,
         function_prefix: String,
     ) -> vm::VMFunctionName;
     fn from_function_definition(function_definition: &ast::JillFunction) -> Self;
@@ -37,7 +37,7 @@ impl JillFunctionReferenceExtensions for ast::JillFunctionReference {
     // TODO: try to do this more elegantly (and give a nicer name)
     fn to_fully_qualified_hack_name(
         &self,
-        local_module_name: &String,
+        local_module_name: &str,
         local_function_prefix: String,
     ) -> vm::VMFunctionName {
         // format: `Module_Path_Elements.[OptionalType_][optionalFunction_prefixes_]functionName`

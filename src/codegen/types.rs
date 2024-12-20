@@ -42,7 +42,7 @@ fn construct_type(
 fn construct_tag(
     jill_type: &ast::JillType,
     module_context: &mut ModuleContext,
-    program_context: &mut ProgramContext,
+    _program_context: &ProgramContext,
 ) {
     // "{module_context.module_name}.{type_name}_tag"
     let function_name =

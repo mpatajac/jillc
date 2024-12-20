@@ -171,6 +171,8 @@ pub mod output {
             Self { name, content }
         }
 
+        /// NOTE: only actually used in tests
+        #[cfg(test)]
         pub fn content(&self) -> &str {
             &self.content
         }

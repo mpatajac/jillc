@@ -12,7 +12,7 @@ use crate::{
     fileio::output::OutputFile,
 };
 
-pub fn construct(program_context: &mut ProgramContext) -> Result<Option<OutputFile>, Error> {
+pub fn construct(program_context: &ProgramContext) -> Result<Option<OutputFile>, Error> {
     let functions_to_dispatch = program_context.function_dispatch.collect();
 
     if functions_to_dispatch.is_empty() {
@@ -23,7 +23,7 @@ pub fn construct(program_context: &mut ProgramContext) -> Result<Option<OutputFi
     let instruction_block: vm::VMInstructionBlock = [
         construct_new(),
         construct_dispose(),
-        construct_call(functions_to_dispatch, program_context)?,
+        construct_call(&functions_to_dispatch, program_context)?,
     ]
     .concat()
     .into();
@@ -78,8 +78,8 @@ fn construct_dispose() -> Vec<vm::VMInstruction> {
 }
 
 fn construct_call(
-    functions_to_dispatch: Vec<(vm::VMFunctionName, FunctionReferenceIndex)>,
-    program_context: &mut ProgramContext,
+    functions_to_dispatch: &[(vm::VMFunctionName, FunctionReferenceIndex)],
+    program_context: &ProgramContext,
 ) -> FallableInstructions {
     let vm_function_name = vm::VMFunctionName::from_literal("Fn._call");
 
@@ -187,7 +187,7 @@ fn construct_call(
 
 fn get_function_metadata(
     vm_function_name: &vm::VMFunctionName,
-    program_context: &mut ProgramContext,
+    program_context: &ProgramContext,
 ) -> Option<JillFunctionMetadata> {
     program_context
         .program_metadata
@@ -328,8 +328,8 @@ mod tests {
         .join("\n");
 
         assert!(construct_call(
-            program_context.function_dispatch.collect(),
-            &mut program_context,
+            &program_context.function_dispatch.collect(),
+            &program_context,
         )
         .is_ok_and(
             |instructions| vm::VMInstructionBlock::from(instructions).compile() == expected

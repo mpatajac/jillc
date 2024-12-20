@@ -3,11 +3,6 @@
 //! Note: all types are prefixed with `Jill` to avoid potential
 //! name collision with existing keywords/phrases (e.g. Type).
 
-#[derive(Debug)]
-pub struct JillProgram {
-    pub modules: Vec<JillModule>,
-}
-
 // region: non-terminals
 
 #[derive(Debug)]

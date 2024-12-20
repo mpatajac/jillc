@@ -14,6 +14,7 @@ fn main() {
 }
 
 fn compile(root_path: &Path) {
+    // TODO: error handling
     let source_dir = SourceDir::setup(root_path).unwrap();
     let output_generator = OutputGenerator::setup(root_path).unwrap();
 

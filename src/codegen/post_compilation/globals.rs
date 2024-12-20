@@ -3,7 +3,7 @@ use crate::{
     fileio::output::OutputFile,
 };
 
-pub fn construct(program_context: &mut ProgramContext) -> Option<OutputFile> {
+pub fn construct(program_context: &ProgramContext) -> Option<OutputFile> {
     if program_context.globals.is_empty() {
         // no globals in any module - no need to generate anything
         return None;
@@ -67,7 +67,7 @@ mod tests {
             "return",
         ];
 
-        let output = construct(&mut program_context).expect("should be Some(_)");
+        let output = construct(&program_context).expect("should be Some(_)");
 
         // since the output is built from hashset elements, we can't
         // directly compare to expected output (order is not guaranteed)
@@ -94,10 +94,10 @@ mod tests {
 
     #[test]
     fn test_no_globals() {
-        let mut program_context = ProgramContext::new();
+        let program_context = ProgramContext::new();
 
         assert_eq!(
-            construct(&mut program_context)
+            construct(&program_context)
                 .as_ref()
                 .map(OutputFile::content),
             None

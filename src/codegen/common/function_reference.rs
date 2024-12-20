@@ -11,7 +11,7 @@ use crate::{
 
 pub fn construct(
     function_reference: &ast::JillFunctionReference,
-    module_context: &mut ModuleContext,
+    module_context: &ModuleContext,
     program_context: &mut ProgramContext,
 ) -> FallableInstructions {
     let function_context = module_context
@@ -118,15 +118,12 @@ mod tests {
         ]
         .join("\n");
 
-        assert!(construct(
-            &function_reference,
-            &mut module_context,
-            &mut program_context
-        )
-        .is_ok_and(
-            |instructions| vm::VMInstructionBlock::from(instructions).compile()
-                == expected_instructions
-        ));
+        assert!(
+            construct(&function_reference, &module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile()
+                    == expected_instructions
+            )
+        );
     }
 
     #[test]
@@ -147,12 +144,10 @@ mod tests {
             function_name: ast::JillIdentifier(String::from("bar")),
         };
 
-        assert!(construct(
-            &function_reference,
-            &mut module_context,
-            &mut program_context
-        )
-        .is_err_and(|error| matches!(error, Error::InvalidFunctionReference(_))));
+        assert!(
+            construct(&function_reference, &module_context, &mut program_context)
+                .is_err_and(|error| matches!(error, Error::InvalidFunctionReference(_)))
+        );
     }
 
     #[test]
@@ -254,14 +249,11 @@ mod tests {
         ]
         .join("\n");
 
-        assert!(construct(
-            &function_reference,
-            &mut module_context,
-            &mut program_context
-        )
-        .is_ok_and(
-            |instructions| vm::VMInstructionBlock::from(instructions).compile()
-                == expected_instructions
-        ));
+        assert!(
+            construct(&function_reference, &module_context, &mut program_context).is_ok_and(
+                |instructions| vm::VMInstructionBlock::from(instructions).compile()
+                    == expected_instructions
+            )
+        );
     }
 }

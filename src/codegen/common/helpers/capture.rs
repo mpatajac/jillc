@@ -27,7 +27,7 @@ pub fn construct_captures_array(
                     |capture_variable_context| Ok(capture_variable_context.push()),
                 )
         },
-        array_instructions_build_config,
+        &array_instructions_build_config,
     );
 
     // array
