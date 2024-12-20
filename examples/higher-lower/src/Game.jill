@@ -1,4 +1,3 @@
-
 -- @type () -> Int
 fn enterGuess = Keyboard::readInt("Enter number: ").
 

@@ -1,4 +1,3 @@
-
 let enterKeyCode = 128.
 
 -- Print a string and follow it with a newline.
