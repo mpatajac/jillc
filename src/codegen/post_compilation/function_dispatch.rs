@@ -122,6 +122,10 @@ fn construct_call(
         // repeat loop
         vm::label(vm::LabelAction::Goto, "ARGS_INIT_START"),
         vm::label(vm::LabelAction::Label, "ARGS_INIT_END"),
+        // deAlloc arguments array (AFTER all have been pushed to stack)
+        vm::push(vm::Segment::Argument, 2),
+        vm::call(vm::VMFunctionName::from_literal("Array.dispose"), 1),
+        FN_TEMP_STORAGE.pop(),
     ];
 
     let captures = vec![
