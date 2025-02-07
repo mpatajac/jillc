@@ -1,16 +1,16 @@
 -- Reference implementation of the `List::dispose` function.
 -- @type List(a) -> ()
 fn dispose list = 
-	-- store tail to enable tail-recursive call
+	-- store list tail to enable tail-recursive call
+	-- NOTE: potentially invalid (if list has no tail),
+	-- but only used after "more elements" check
 	let tail = List::List:tail(list),
+	let hasMoreElements = Bool::not(List::isEmpty(list)),
 
 	do(
 		-- shallow free (only the list pointer, not its elements)
 		Memory::deAlloc(list),
 		
 		-- recursive call on the rest of the list
-		if(
-			Bool::not(List::isEmpty(list)),
-			dispose(tail)
-		)
-).
+		if(hasMoreElements, dispose(tail))
+	).
