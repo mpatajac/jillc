@@ -209,7 +209,7 @@ fn get_function_metadata(
 mod tests {
     use super::*;
 
-    #[allow(clippy::similar_names, clippy::redundant_clone)]
+    #[allow(clippy::similar_names, clippy::redundant_clone, clippy::too_many_lines)]
     #[test]
     fn test_dispatch_call_construction() {
         let mut program_context = ProgramContext::new();
@@ -283,6 +283,10 @@ mod tests {
             "pop temp 7",
             "goto ARGS_INIT_START",
             "label ARGS_INIT_END",
+            // args array cleanup
+            "push argument 2",
+            "call Array.dispose 1",
+            "pop temp 7",
             // end SECTION: push args on stack
             // captures
             "push this 1",
