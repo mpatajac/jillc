@@ -67,9 +67,15 @@ fn construct_dispose() -> Vec<vm::VMInstruction> {
         vm::push(vm::Segment::Argument, 0),
         vm::pop(vm::Segment::Pointer, 0),
         // dispose captures array
+        // NOTE: must perform a null check (if there were no captures)
+        vm::push(vm::Segment::This, 1),
+        vm::null(),
+        vm::command(vm::VMCommand::Eq),
+        vm::label(vm::LabelAction::IfGoto, "SKIP_CAPTURES_DEALLOC"),
         vm::push(vm::Segment::This, 1),
         vm::call(vm::VMFunctionName::from_literal("Array.dispose"), 1),
         FN_TEMP_STORAGE.pop(),
+        vm::label(vm::LabelAction::Label, "SKIP_CAPTURES_DEALLOC"),
         // deAlloc closure object
         vm::push(vm::Segment::Argument, 0),
         vm::call(vm::VMFunctionName::from_literal("Memory.deAlloc"), 1),
