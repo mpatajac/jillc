@@ -6,6 +6,7 @@
 fn disposeWith list headDisposer =
 	-- store tail to enable tail-recursive call
 	let tail = List::List:tail(list),
+	let isEmpty = List::isEmpty(list),
 
 	do(
 		-- dispose list head
@@ -16,7 +17,7 @@ fn disposeWith list headDisposer =
 
 		-- recursive call on the rest of the list
 		ifElse(
-			List::isEmpty(list),
+			isEmpty,
 			-- reached the end of the list - dispose closure
 			Fn::dispose(headDisposer),
 			disposeWith(tail, headDisposer)
