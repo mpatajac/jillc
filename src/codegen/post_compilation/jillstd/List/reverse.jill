@@ -1,0 +1,23 @@
+-- Reference implementation of the `List::reverse` function.
+-- @type List(a) -> List(a)
+fn reverse list =
+	-- helper for tail-recursive implementation
+	fn reverseRec acc list = 
+		List::List:match(
+			list,
+			-- Empty
+			acc,
+			-- List(_)
+			reverseRec(
+				-- prepend current element (list head) to
+				-- the rest of the (accumulated) list
+				List::List(
+					List::List:head(list),
+					acc
+				),
+				-- and do the same with the rest of the list
+				List::List:tail(list)
+			)
+		).
+
+	reverseRec(List::Empty(), list).

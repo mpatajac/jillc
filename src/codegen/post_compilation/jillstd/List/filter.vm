@@ -1,3 +1,12 @@
+function List.filter_reverseAndCleanup 1
+push argument 0
+call List.reverse 1
+pop local 0
+push argument 0
+call List.dispose 1
+pop temp 0
+push local 0
+return
 function List.filter_filterRec 0
 label REC_CALL_0
 push argument 1
@@ -39,7 +48,7 @@ pop argument 0
 goto REC_CALL_0
 label VARIANT_0_0
 push argument 0
-call List.reverse 1
+call List.filter_reverseAndCleanup 1
 return
 function List.filter 0
 call List.Empty 0

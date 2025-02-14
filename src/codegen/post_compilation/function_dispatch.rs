@@ -67,9 +67,15 @@ fn construct_dispose() -> Vec<vm::VMInstruction> {
         vm::push(vm::Segment::Argument, 0),
         vm::pop(vm::Segment::Pointer, 0),
         // dispose captures array
+        // NOTE: must perform a null check (if there were no captures)
+        vm::push(vm::Segment::This, 1),
+        vm::null(),
+        vm::command(vm::VMCommand::Eq),
+        vm::label(vm::LabelAction::IfGoto, "SKIP_CAPTURES_DEALLOC"),
         vm::push(vm::Segment::This, 1),
         vm::call(vm::VMFunctionName::from_literal("Array.dispose"), 1),
         FN_TEMP_STORAGE.pop(),
+        vm::label(vm::LabelAction::Label, "SKIP_CAPTURES_DEALLOC"),
         // deAlloc closure object
         vm::push(vm::Segment::Argument, 0),
         vm::call(vm::VMFunctionName::from_literal("Memory.deAlloc"), 1),
@@ -116,6 +122,10 @@ fn construct_call(
         // repeat loop
         vm::label(vm::LabelAction::Goto, "ARGS_INIT_START"),
         vm::label(vm::LabelAction::Label, "ARGS_INIT_END"),
+        // deAlloc arguments array (AFTER all have been pushed to stack)
+        vm::push(vm::Segment::Argument, 2),
+        vm::call(vm::VMFunctionName::from_literal("Array.dispose"), 1),
+        FN_TEMP_STORAGE.pop(),
     ];
 
     let captures = vec![
@@ -199,7 +209,7 @@ fn get_function_metadata(
 mod tests {
     use super::*;
 
-    #[allow(clippy::similar_names, clippy::redundant_clone)]
+    #[allow(clippy::similar_names, clippy::redundant_clone, clippy::too_many_lines)]
     #[test]
     fn test_dispatch_call_construction() {
         let mut program_context = ProgramContext::new();
@@ -273,6 +283,10 @@ mod tests {
             "pop temp 7",
             "goto ARGS_INIT_START",
             "label ARGS_INIT_END",
+            // args array cleanup
+            "push argument 2",
+            "call Array.dispose 1",
+            "pop temp 7",
             // end SECTION: push args on stack
             // captures
             "push this 1",

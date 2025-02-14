@@ -12,8 +12,13 @@ function Fn.dispose 0
 push argument 0
 pop pointer 0
 push this 1
+push constant 0
+eq
+if-goto SKIP_CAPTURES_DEALLOC
+push this 1
 call Array.dispose 1
 pop temp 7
+label SKIP_CAPTURES_DEALLOC
 push argument 0
 call Memory.deAlloc 1
 return
@@ -38,6 +43,9 @@ add
 pop temp 7
 goto ARGS_INIT_START
 label ARGS_INIT_END
+push argument 2
+call Array.dispose 1
+pop temp 7
 push this 1
 push constant 0
 eq
@@ -45,7 +53,7 @@ if-goto SKIP_CAPTURES
 push this 1
 label SKIP_CAPTURES
 push this 0
-push constant 0
+push constant 3
 eq
 if-goto FN_0
 push this 0
@@ -53,15 +61,15 @@ push constant 4
 eq
 if-goto FN_1
 push this 0
-push constant 5
+push constant 0
 eq
 if-goto FN_2
 push this 0
-push constant 6
+push constant 5
 eq
 if-goto FN_3
 push this 0
-push constant 2
+push constant 6
 eq
 if-goto FN_4
 push this 0
@@ -69,29 +77,29 @@ push constant 1
 eq
 if-goto FN_5
 push this 0
-push constant 3
+push constant 2
 eq
 if-goto FN_6
 push constant 0
 return
 label FN_0
-call Int.add 2
+call Int.max 2
 return
 label FN_1
 call Int.min 2
 return
 label FN_2
-call Main.centeredAverage_total 1
+call Int.add 2
 return
 label FN_3
-call Main.centeredAverage_count 1
+call Main.centeredAverage_total 1
 return
 label FN_4
-call List.length 1
+call Main.centeredAverage_count 1
 return
 label FN_5
 call Main.listSum 1
 return
 label FN_6
-call Int.max 2
+call List.length 1
 return

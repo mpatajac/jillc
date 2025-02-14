@@ -1,0 +1,35 @@
+-- Reference implementation of the `List::map` function.
+-- @type List(a), Fn(a -> b) -> List(b)
+fn map list f =
+	fn reverseAndCleanup list =
+		let reversedList = List::reverse(list),
+
+		do(
+			List::dispose(list),
+			StdUtils::identity(reversedList)
+		).
+
+	-- helper for tail-recursive implementation
+	fn mapRec acc list f = 
+		List::List:match(
+			list,
+			-- Empty
+			-- list was constructed in the reverse order -
+			-- reverse the result to get the original order
+			reverseAndCleanup(acc),
+			-- List(_)
+			mapRec(
+				-- prepend the mapped current element (list head)
+				-- to the rest of the (accumulated) list
+				List::List(
+					f(List::List:head(list)),
+					acc
+				),
+				-- and do the same with the rest of the list
+				List::List:tail(list),
+				-- don't forget to pass along the function
+				f
+			)
+		).
+
+	mapRec(List::Empty(), list, f).
