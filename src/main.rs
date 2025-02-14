@@ -1,3 +1,4 @@
+use anyhow::{bail, Result};
 use fileio::{input::SourceDir, output::OutputGenerator};
 use std::path::Path;
 
@@ -10,27 +11,34 @@ fn main() {
     // TODO: replace with `clap`
     let root_path = std::env::args().nth(1).unwrap_or_else(|| String::from("."));
 
-    compile(Path::new(&root_path));
+    if let Err(error) = compile(Path::new(&root_path)) {
+        eprintln!("Compilation error: {error}");
+    }
 }
 
-fn compile(root_path: &Path) {
-    // TODO: error handling
-    let source_dir = SourceDir::setup(root_path).unwrap();
-    let output_generator = OutputGenerator::setup(root_path).unwrap();
+fn compile(root_path: &Path) -> Result<()> {
+    let source_dir = SourceDir::setup(root_path)?;
+    let output_generator = OutputGenerator::setup(root_path)?;
 
     let mut program_context = codegen::context::ProgramContext::new();
 
+    // (try to) load file by file (per Jill module)
     for (file_path, file) in source_dir {
+        // TODO: refactor to remove/reduce nesting
         match file {
-            Err(error) => eprintln!("Unable to load file at `{file_path:#?}`: {error}"),
+            Err(error) => bail!("unable to load file at `{file_path:#?}`: {error}"),
+
+            // file content loaded - (try to) parse code into AST
             Ok(file_info) => match parser::parse_module(&file_info) {
                 Ok(ast) => {
-                    // dbg!(&ast);
+                    // convert AST to VM instructions
                     match codegen::construct_module(ast, &mut program_context) {
-                        Ok(output_file) => output_generator.generate(output_file).unwrap(),
-                        Err(error) => eprintln!("{error:#?}"),
+                        // (try to) output generated VM instructions to designated file
+                        Ok(output_file) => output_generator.generate(output_file)?,
+                        Err(error) => bail!("{error:#?}"),
                     };
                 }
+                // parsing failed - display the syntax error
                 Err(errors) => error_report::display(
                     file_path.to_string_lossy().as_ref(),
                     file_info.content(),
@@ -40,13 +48,13 @@ fn compile(root_path: &Path) {
         }
     }
 
-    apply_post_compilation_generation(&output_generator, &mut program_context).unwrap();
+    apply_post_compilation_generation(&output_generator, &mut program_context)
 }
 
 fn apply_post_compilation_generation(
     output_generator: &OutputGenerator,
     program_context: &mut codegen::context::ProgramContext,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     use codegen::post_compilation;
 
     // globals initialization

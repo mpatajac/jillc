@@ -96,6 +96,12 @@ pub mod input {
             let mut source_file_paths = vec![];
             Self::collect_source_files(&src_path, &mut source_file_paths)?;
 
+            if source_file_paths.is_empty() {
+                return Err(io::Error::other(
+                    "no source files found in the `src` directory",
+                ));
+            }
+
             Ok(Self {
                 src_path,
                 current_file_index: 0,

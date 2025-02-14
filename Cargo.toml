@@ -10,6 +10,7 @@ strum_macros = { version = "0.26" }
 heck = "0.5"
 ariadne = "0.4"
 phf = { version = "0.11", features = ["macros"] }
+anyhow = "1"
 
 
 [lints.clippy]
