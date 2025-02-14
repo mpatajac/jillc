@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use clap::Parser;
 use fileio::{input::SourceDir, output::OutputGenerator};
 use std::path::Path;
 
@@ -7,11 +8,17 @@ mod common;
 mod fileio;
 mod parser;
 
-fn main() {
-    // TODO: replace with `clap`
-    let root_path = std::env::args().nth(1).unwrap_or_else(|| String::from("."));
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[arg(default_value_t = String::from("./"))]
+    root_path: String,
+}
 
-    if let Err(error) = compile(Path::new(&root_path)) {
+fn main() {
+    let cli = Cli::parse();
+
+    if let Err(error) = compile(Path::new(&cli.root_path)) {
         eprintln!("Compilation error: {error}");
     }
 }

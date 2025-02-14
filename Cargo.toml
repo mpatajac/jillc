@@ -1,6 +1,7 @@
 [package]
 name = "jillc"
 version = "0.1.0"
+description = "Compiler for the Jill programming language (an alternative to Jack from the Nand2Tetris course/platform)"
 edition = "2021"
 
 [dependencies]
@@ -11,6 +12,7 @@ heck = "0.5"
 ariadne = "0.4"
 phf = { version = "0.11", features = ["macros"] }
 anyhow = "1"
+clap = { version = "4.5", features = ["derive"] }
 
 
 [lints.clippy]
