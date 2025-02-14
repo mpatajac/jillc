@@ -1,3 +1,13 @@
+function Random.fromRange 1
+push argument 0
+call Random.next 1
+push argument 2
+push argument 1
+sub
+call Int.mod 2
+push argument 1
+add
+return
 function Random.next 2
 push argument 0
 pop pointer 0
@@ -33,16 +43,6 @@ add
 pop this 0
 label IF_FALSE0
 push this 0
-return
-function Random.fromRange 1
-push argument 0
-call Random.next 1
-push argument 2
-push argument 1
-sub
-call Int.mod 2
-push argument 1
-add
 return
 function Random.Random 0
 push constant 3
