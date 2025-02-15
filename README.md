@@ -5,11 +5,11 @@ Jill is a functional programming language built for the [Nand2Tetris](https://ww
 It is designed as a drop-in replacement for Jack, as it uses the same VM instruction set and underlying *HACK* architecture, and follows similar design principles (willing to sacrifice ease of use to favour ease of implementation), while offering an alternative to Jack's very object-oriented, verbose style (*I like to think of Jill as Jack's more elegant, modern sister*).
 
 ### Some notable features:
-- functions as first-class citizens (abilty to store them in variables, pass them on to other functions as arguments, and return from functions as a result)
+- functions as first-class citizens (ability to store them in variables, pass them on to other functions as arguments, and return from functions as a result)
 - optimized tail-call recursion to use constant stack space (single stack frame)
 - data modeling using algebraic data types with primitive pattern-matching (per type variant)
   - note that, as with Jack, all variables are still effectively 16-bit integers, therefore Jill is dynamically typed
-- minimal lanugage design
+- minimal language design
   - only 3 main concepts (types, variables and functions)
   - expressions can only be literals, variables or function calls
 - expanded standard library which is lazily-generated (instructions are generated only for modules and functions which were used in codebase)
