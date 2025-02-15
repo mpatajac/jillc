@@ -57,7 +57,7 @@ You can find several examples of Jill code/projects in the `examples` directory.
 ## Setup
 
 ### Pre-built
-TODO: link to a released pre-built exe/binary
+You can find a pre-built Windows executable in the latest [release](https://github.com/mpatajac/jillc/releases).
 
 ### Manual
 
