@@ -18,7 +18,7 @@ It is designed as a drop-in replacement for Jack, as it uses the same VM instruc
 
 ## Usage
 
-TODO: add link to language tour
+For an overview of Jill's concepts and syntax, take a look at the [language tour](https://github.com/mpatajac/jillc/wiki/Language-tour).
 
 ### Project structure
 
