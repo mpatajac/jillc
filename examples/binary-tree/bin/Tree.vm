@@ -1,0 +1,242 @@
+function Tree.BinaryTree_tag 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function Tree.Null 0
+push constant 1
+call Memory.alloc 1
+pop pointer 0
+push constant 0
+pop this 0
+push pointer 0
+return
+function Tree.Node 0
+push constant 4
+call Memory.alloc 1
+pop pointer 0
+push argument 0
+pop this 1
+push argument 1
+pop this 2
+push argument 2
+pop this 3
+push constant 1
+pop this 0
+push pointer 0
+return
+function Tree.Node_left 0
+push argument 0
+pop pointer 0
+push this 1
+return
+function Tree.Node_value 0
+push argument 0
+pop pointer 0
+push this 2
+return
+function Tree.Node_right 0
+push argument 0
+pop pointer 0
+push this 3
+return
+function Tree.Node_updateLeft 0
+push argument 0
+pop pointer 0
+push argument 1
+push this 2
+push this 3
+call Tree.Node 3
+return
+function Tree.Node_updateValue 0
+push argument 0
+pop pointer 0
+push this 1
+push argument 1
+push this 3
+call Tree.Node 3
+return
+function Tree.Node_updateRight 0
+push argument 0
+pop pointer 0
+push this 1
+push this 2
+push argument 1
+call Tree.Node 3
+return
+function Tree.leaf 0
+call Tree.Null 0
+push argument 0
+call Tree.Null 0
+call Tree.Node 3
+return
+function Tree.printValues_inorderPrint 0
+label REC_CALL_0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_left 1
+call Tree.printValues_inorderPrint 1
+pop temp 0
+push argument 0
+call Tree.Node_value 1
+call Output.printInt 1
+pop temp 0
+push constant 1
+call String.new 1
+push constant 32
+call String.appendChar 2
+call Output.printString 1
+pop temp 0
+push argument 0
+call Tree.Node_right 1
+pop argument 0
+goto REC_CALL_0
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 0
+call String.new 1
+call Output.printString 1
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Tree.printValues 0
+push argument 0
+call Tree.printValues_inorderPrint 1
+pop temp 0
+call Output.println 0
+return
+function Tree.count 0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_left 1
+call Tree.count 1
+push argument 0
+call Tree.Node_right 1
+call Tree.count 1
+add
+call Int.inc 1
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 0
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Tree.sum 0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_value 1
+push argument 0
+call Tree.Node_left 1
+call Tree.sum 1
+push argument 0
+call Tree.Node_right 1
+call Tree.sum 1
+add
+add
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 0
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Tree.min 0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_value 1
+push argument 0
+call Tree.Node_left 1
+call Tree.min 1
+push argument 0
+call Tree.Node_right 1
+call Tree.min 1
+call Math.min 2
+call Math.min 2
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 32767
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Tree.max 0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_value 1
+push argument 0
+call Tree.Node_left 1
+call Tree.max 1
+push argument 0
+call Tree.Node_right 1
+call Tree.max 1
+call Math.max 2
+call Math.max 2
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 32767
+neg
+goto MATCH_END_0
+label MATCH_END_0
+return
+function Tree.contains 0
+push argument 0
+call Tree.BinaryTree_tag 1
+pop temp 0
+push temp 0
+push constant 0
+eq
+if-goto VARIANT_0_0
+label VARIANT_1_0
+push argument 0
+call Tree.Node_value 1
+push argument 1
+eq
+push argument 0
+call Tree.Node_left 1
+push argument 1
+call Tree.contains 2
+push argument 0
+call Tree.Node_right 1
+push argument 1
+call Tree.contains 2
+or
+or
+goto MATCH_END_0
+label VARIANT_0_0
+push constant 0
+goto MATCH_END_0
+label MATCH_END_0
+return

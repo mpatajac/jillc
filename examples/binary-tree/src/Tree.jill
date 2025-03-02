@@ -1,0 +1,106 @@
+-- @type Null
+-- @type Node(BinaryTree(a), a, BinaryTree(a))
+type BinaryTree =
+	Null,
+	Node(left, value, right).
+
+-- Create a "leaf" node (with no sub-trees)
+-- @type a -> BinaryTree(a)
+fn leaf value = Node(Null(), value, Null()).
+
+-- @type BinaryTree(Int) -> ()
+fn printValues tree = 
+	fn inorderPrint tree = BinaryTree:match(
+		tree,
+		-- Null
+		Output::printString(""),
+		-- Node(..)
+		do(
+			inorderPrint(Node:left(tree)),
+			Output::printInt(Node:value(tree)),
+			Output::printString(" "),
+			inorderPrint(Node:right(tree)),
+		)
+	).
+
+	do(
+		inorderPrint(tree),
+		Output::println(),
+	).
+
+
+-- @type BinaryTree(a) -> Int
+fn count tree = BinaryTree:match(
+	tree,
+	-- Null
+	0,
+	-- Node(..)
+	Int::inc(Int::add(
+		count(Node:left(tree)),
+		count(Node:right(tree)),
+	))
+).
+
+
+-- @type BinaryTree(a) -> Int
+fn sum tree = BinaryTree:match(
+	tree,
+	-- Null
+	0,
+	-- Node(..)
+	Int::add(
+		Node:value(tree),
+		Int::add(
+			sum(Node:left(tree)),
+			sum(Node:right(tree)),
+		)
+	)
+).
+
+
+-- @type BinaryTree(a) -> Int
+fn min tree = BinaryTree:match(
+	tree,
+	-- Null
+	32767,
+	-- Node(..)
+	Int::min(
+		Node:value(tree),
+		Int::min(
+			min(Node:left(tree)),
+			min(Node:right(tree)),
+		)
+	)
+).
+
+
+-- @type BinaryTree(a) -> Int
+fn max tree = BinaryTree:match(
+	tree,
+	-- Null
+	Int::neg(32767),
+	-- Node(..)
+	Int::max(
+		Node:value(tree),
+		Int::max(
+			max(Node:left(tree)),
+			max(Node:right(tree)),
+		)
+	)
+).
+
+
+-- @type BinaryTree(a) -> Bool
+fn contains tree elem = BinaryTree:match(
+	tree,
+	-- Null
+	False,
+	-- Node(..)
+	Bool::or(
+		Bool::eq(Node:value(tree), elem),
+		Bool::or(
+			contains(Node:left(tree), elem),
+			contains(Node:right(tree), elem),
+		)
+	)
+).

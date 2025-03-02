@@ -1,0 +1,50 @@
+-- @type String, Int -> ()
+fn printResult label value = do(
+	Output::printString(label),
+	Output::printInt(value),
+	Output::println(),
+).
+
+-- @type String, Bool -> ()
+fn printBoolResult label b = 
+	let value = ifElse(b, 1, 0),
+
+	printResult(label, value).
+
+
+fn main =
+	-- @type Tree::BinaryTree(Int)
+	let tree = Tree::Node(
+		Tree::Node (
+			Tree::leaf(2),
+			7,
+			Tree::Node(
+				Tree::leaf(5),
+				6,
+				Tree::leaf(11)
+			)
+		),
+		1,
+		Tree::Node(
+			Tree::Null(),
+			9,
+			Tree::Node(
+				Tree::leaf(5),
+				9,
+				Tree::Null(),
+			)
+		)
+	),
+
+	do(
+		Tree::printValues(tree),
+		Output::println(),
+
+		printResult("Nodes in tree: ", Tree::count(tree)),
+		printResult("Sum of tree: ", Tree::sum(tree)),
+		printResult("Min of tree: ", Tree::min(tree)),
+		printResult("Max of tree: ", Tree::max(tree)),
+		printBoolResult("Contains 7: ", Tree::contains(tree, 7)),
+		printBoolResult("Contains 3: ", Tree::contains(tree, 3)),
+	).
+
