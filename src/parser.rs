@@ -220,6 +220,7 @@ fn r#type() -> impl Parser<char, JillType, Error = JillParseError> {
                 .delimited_by(just('('), just(')'))
                 .or_not(),
         )
+        .padded_by(comments())
         .map(|(name, fields)| JillTypeVariant {
             name,
             fields: fields.unwrap_or(Vec::new()),

@@ -1,7 +1,7 @@
--- @type Null
--- @type Node(BinaryTree(a), a, BinaryTree(a))
 type BinaryTree =
+	-- @type Null
 	Null,
+	-- @type Node(BinaryTree(a), a, BinaryTree(a))
 	Node(left, value, right).
 
 -- Create a "leaf" node (with no sub-trees)
