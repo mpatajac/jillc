@@ -18,7 +18,7 @@ pub fn construct(
         .scope
         .search_function(&function_reference.type_associated_function_name());
 
-    if !is_valid_function_reference(function_reference, &function_context) {
+    if !is_valid_function_reference(function_reference, function_context.as_ref()) {
         return invalid_function_reference(function_reference);
     }
 
@@ -68,7 +68,7 @@ pub fn construct(
 /// or an existing (found module-local) function
 fn is_valid_function_reference(
     function_reference: &ast::JillFunctionReference,
-    function_context: &Option<FunctionContext>,
+    function_context: Option<&FunctionContext>,
 ) -> bool {
     function_reference.is_fully_qualified() || function_context.is_some()
 }

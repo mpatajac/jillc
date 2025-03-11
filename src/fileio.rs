@@ -120,7 +120,7 @@ pub mod input {
                 }
 
                 // only add `.jill` files
-                if path.extension().map_or(false, |ext| ext == "jill") {
+                if path.extension().is_some_and(|ext| ext == "jill") {
                     collected.push(path);
                 }
             }
